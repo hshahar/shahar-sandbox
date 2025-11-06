@@ -1,0 +1,51 @@
+# Production Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sha-k8s-blog-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/yourusername/k8s-blog-platform.git  # Change to your repo
+    targetRevision: HEAD
+    path: helm/microservices-app
+    helm:
+      releaseName: sha-k8s-blog-prod
+      valueFiles:
+        - values-prod.yaml
+      parameters:
+        - name: environment
+          value: "prod"
+        - name: frontend.replicas
+          value: "3"
+        - name: backend.replicas
+          value: "3"
+        - name: postgresql.persistence.size
+          value: "10Gi"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sha-production
+  
+  # Manual sync for production (no automated)
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  syncWave: 10
+  
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas

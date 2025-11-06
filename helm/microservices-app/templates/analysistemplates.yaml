@@ -1,0 +1,156 @@
+{{- if .Values.argoRollouts.enabled }}
+---
+# AnalysisTemplate: Success Rate Check
+# Ensures error rate is below threshold
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-success-rate
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  - name: success-rate
+    interval: 30s
+    count: {{ .Values.argoRollouts.analysis.successRate.count }}
+    successCondition: result >= {{ .Values.argoRollouts.analysis.successRate.threshold }}
+    failureLimit: {{ .Values.argoRollouts.analysis.successRate.failureLimit }}
+    
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(
+            http_requests_total{
+              job="{{`{{args.service-name}}`}}",
+              status!~"5.."
+            }[2m]
+          )) 
+          / 
+          sum(rate(
+            http_requests_total{
+              job="{{`{{args.service-name}}`}}"
+            }[2m]
+          )) * 100
+
+---
+# AnalysisTemplate: Latency Check (P95)
+# Ensures P95 latency is below threshold
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-latency
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  - name: latency-p95
+    interval: 30s
+    count: {{ .Values.argoRollouts.analysis.latency.count }}
+    successCondition: result <= {{ .Values.argoRollouts.analysis.latency.threshold }}
+    failureLimit: {{ .Values.argoRollouts.analysis.latency.failureLimit }}
+    
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          histogram_quantile(0.95,
+            sum(rate(
+              http_request_duration_seconds_bucket{
+                job="{{`{{args.service-name}}`}}"
+              }[2m]
+            )) by (le)
+          ) * 1000
+
+---
+# AnalysisTemplate: Resource Usage Check
+# Ensures CPU and Memory are within limits
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-resource-usage
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  - name: cpu-usage
+    interval: 30s
+    count: {{ .Values.argoRollouts.analysis.resources.count }}
+    successCondition: result <= {{ .Values.argoRollouts.analysis.resources.cpuThreshold }}
+    failureLimit: {{ .Values.argoRollouts.analysis.resources.failureLimit }}
+    
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(rate(
+            container_cpu_usage_seconds_total{
+              pod=~"{{`{{args.service-name}}`}}.*"
+            }[2m]
+          )) / 
+          sum(
+            kube_pod_container_resource_limits{
+              pod=~"{{`{{args.service-name}}`}}.*",
+              resource="cpu"
+            }
+          ) * 100
+  
+  - name: memory-usage
+    interval: 30s
+    count: {{ .Values.argoRollouts.analysis.resources.count }}
+    successCondition: result <= {{ .Values.argoRollouts.analysis.resources.memoryThreshold }}
+    failureLimit: {{ .Values.argoRollouts.analysis.resources.failureLimit }}
+    
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(
+            container_memory_working_set_bytes{
+              pod=~"{{`{{args.service-name}}`}}.*"
+            }
+          ) / 
+          sum(
+            kube_pod_container_resource_limits{
+              pod=~"{{`{{args.service-name}}`}}.*",
+              resource="memory"
+            }
+          ) * 100
+
+---
+# AnalysisTemplate: Uptime Check
+# Ensures pods are ready and healthy
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: backend-uptime
+  namespace: {{ .Values.namespace }}
+spec:
+  args:
+  - name: service-name
+  
+  metrics:
+  - name: pod-ready-ratio
+    interval: 30s
+    count: {{ .Values.argoRollouts.analysis.uptime.count }}
+    successCondition: result >= {{ .Values.argoRollouts.analysis.uptime.threshold }}
+    failureLimit: {{ .Values.argoRollouts.analysis.uptime.failureLimit }}
+    
+    provider:
+      prometheus:
+        address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        query: |
+          sum(kube_pod_status_ready{
+            pod=~"{{`{{args.service-name}}`}}.*",
+            condition="true"
+          }) / 
+          sum(kube_pod_status_ready{
+            pod=~"{{`{{args.service-name}}`}}.*"
+          }) * 100
+{{- end }}

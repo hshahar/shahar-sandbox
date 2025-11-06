@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl version:*)",
+      "Bash(terraform version:*)",
+      "Bash(kubectl cluster-info:*)",
+      "Bash(kubectl get:*)",
+      "Bash(helm version:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(docker build:*)",
+      "Bash(kubectl set image:*)",
+      "Bash(kubectl rollout status:*)",
+      "Bash(curl:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(docker run:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl wait:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(helm upgrade:*)",
+      "Bash(where:*)",
+      "Bash(git init:*)",
+      "Bash(git config:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

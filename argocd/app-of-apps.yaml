@@ -1,0 +1,34 @@
+# ArgoCD App of Apps Pattern
+# This application manages all other applications for SHA's K8s Blog Platform
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sha-app-of-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/yourusername/k8s-blog-platform.git  # Change to your repo
+    targetRevision: HEAD
+    path: argocd/applications
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

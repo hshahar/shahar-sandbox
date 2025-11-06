@@ -1,0 +1,277 @@
+# Default values for microservices-app
+# This is a YAML-formatted file.
+
+# Global settings
+environment: dev
+namespace: sha-dev
+nameOverride: ""
+fullnameOverride: ""
+
+# Vault integration
+vault:
+  enabled: true  # Enable in all environments
+  refreshInterval: "1h"  # How often to refresh secrets from Vault
+  address: "http://vault.vault:8200"
+  role: "sha-blog"
+
+# Argo Rollouts (Progressive Delivery)
+argoRollouts:
+  enabled: false  # Enable in staging/prod for canary deployments
+  canary:
+    pauseDuration:
+      step1: "2m"    # Pause after 10%
+      step2: "3m"    # Pause after 25%
+      step3: "5m"    # Pause after 50%
+  analysis:
+    successRate:
+      threshold: 95    # Minimum success rate (%)
+      count: 6         # Number of measurements
+      failureLimit: 2  # Max failures before rollback
+    latency:
+      threshold: 500   # Max P95 latency in ms
+      count: 6
+      failureLimit: 2
+    resources:
+      cpuThreshold: 80       # Max CPU usage (%)
+      memoryThreshold: 85    # Max memory usage (%)
+      count: 5
+      failureLimit: 2
+    uptime:
+      threshold: 99    # Minimum pod ready ratio (%)
+      count: 5
+      failureLimit: 1
+
+# Monitoring (Prometheus + Grafana)
+monitoring:
+  enabled: false  # Enable in all environments for metrics
+  alerts:
+    errorRate:
+      threshold: 5      # Alert if error rate > 5%
+    latencyP95:
+      threshold: 1000   # Alert if P95 latency > 1000ms
+
+# Autoscaling configuration
+autoscaling:
+  enabled: false
+  type: keda  # Options: "keda" or "hpa" (default Kubernetes HPA)
+
+# Frontend configuration
+frontend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 10
+    pollingInterval: 30  # KEDA polling interval in seconds
+    cooldownPeriod: 300  # KEDA cooldown period in seconds
+    cpu:
+      enabled: true
+      targetUtilization: "70"
+    memory:
+      enabled: false
+      targetUtilization: "80"
+    prometheus:
+      enabled: false
+      serverAddress: http://kube-prometheus-stack-prometheus.monitoring:9090
+      threshold: "100"  # Scale when requests/sec > 100
+    # Scale down behavior
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percentagePolicyValue: 50
+      percentagePolicyPeriod: 60
+      podsPolicyValue: 2
+      podsPolicyPeriod: 60
+      selectPolicy: "Min"
+    # Scale up behavior
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      percentagePolicyValue: 100
+      percentagePolicyPeriod: 30
+      podsPolicyValue: 4
+      podsPolicyPeriod: 30
+      selectPolicy: "Max"
+
+# Backend configuration
+backend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: hashicorp/http-echo
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8080
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 10
+    pollingInterval: 30  # KEDA polling interval in seconds
+    cooldownPeriod: 300  # KEDA cooldown period in seconds
+    cpu:
+      enabled: true
+      targetUtilization: "70"
+    memory:
+      enabled: false
+      targetUtilization: "80"
+    prometheus:
+      enabled: false
+      serverAddress: http://kube-prometheus-stack-prometheus.monitoring:9090
+      threshold: "100"  # Scale when requests/sec > 100
+    # Scale down behavior
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percentagePolicyValue: 50
+      percentagePolicyPeriod: 60
+      podsPolicyValue: 2
+      podsPolicyPeriod: 60
+      selectPolicy: "Min"
+    # Scale up behavior
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      percentagePolicyValue: 100
+      percentagePolicyPeriod: 30
+      podsPolicyValue: 4
+      podsPolicyPeriod: 30
+      selectPolicy: "Max"
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  database: sha_blog
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""  # Use default storage class
+  backup:
+    enabled: true  # Enable automated backups
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention: 7  # Keep last 7 backups
+    storageSize: 5Gi  # Storage for backups
+    storageClass: ""  # Use default storage class
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 1
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  host: localhost
+  tls:
+    enabled: false
+    secretName: ""
+
+# Secrets
+secrets:
+  database:
+    username: "dbuser"
+    password: "change-me-in-production"
+  backend:
+    apiKey: "dev-api-key-12345"
+
+# Security Configuration
+security:
+  # User Namespaces (Kubernetes 1.33+)
+  userNamespaces:
+    enabled: false  # Set to true if cluster supports it
+  
+  # Kyverno Policy Engine
+  kyverno:
+    enabled: false  # Install Kyverno separately, then enable
+    validationFailureAction: audit  # or "enforce" for strict mode
+    trustedRegistries:
+      - "docker.io"
+      - "ghcr.io"
+    cosign:
+      keyless: true
+      issuer: "https://token.actions.githubusercontent.com"
+      subject: ".*"
+      rekorURL: "https://rekor.sigstore.dev"
+      publicKey: ""  # If not using keyless
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  allowExternalEgress: true  # Allow backend to call external APIs
+
+# Resource Quota
+resourceQuota:
+  enabled: true
+  hard:
+    requestsCpu: "4"
+    requestsMemory: "8Gi"
+    limitsCpu: "8"
+    limitsMemory: "16Gi"
+    requestsStorage: "50Gi"
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+
+# Limit Range
+limitRange:
+  enabled: true
+  container:
+    max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    default:
+      cpu: "200m"
+      memory: "256Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+  pod:
+    max:
+      cpu: "4"
+      memory: "8Gi"
+  pvc:
+    max:
+      storage: "20Gi"
+    min:
+      storage: "1Gi"

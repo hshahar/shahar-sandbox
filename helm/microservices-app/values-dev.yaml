@@ -1,0 +1,107 @@
+# Development Environment Values
+
+environment: dev
+namespace: sha-dev
+
+# Vault integration - Disabled in dev (use basic secrets)
+vault:
+  enabled: false
+  refreshInterval: "5m"
+
+# Argo Rollouts - Disabled in dev (use regular Deployments)
+argoRollouts:
+  enabled: false
+
+# Monitoring - Enabled for testing
+monitoring:
+  enabled: true
+  alerts:
+    errorRate:
+      threshold: 10  # More lenient in dev
+    latencyP95:
+      threshold: 2000
+
+# Frontend configuration
+frontend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Backend configuration
+backend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: sha-blog-backend
+    tag: "dev"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+# PostgreSQL configuration - Optional in dev
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+  database: sha_blog_dev
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  persistence:
+    size: 1Gi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: sha-dev.blog.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    enabled: false
+
+# Secrets - Use weak passwords in dev
+secrets:
+  database:
+    username: "devuser"
+    password: "devpass123"
+  backend:
+    apiKey: "dev-api-key-12345"
+
+# Security Configuration
+security:
+  userNamespaces:
+    enabled: false
+  kyverno:
+    enabled: false
+    validationFailureAction: audit
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  allowExternalEgress: true

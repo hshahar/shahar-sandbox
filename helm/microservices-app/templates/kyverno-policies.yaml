@@ -1,0 +1,167 @@
+{{- if .Values.security.kyverno.enabled }}
+---
+# Require image signature verification
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-verify-images
+  annotations:
+    policies.kyverno.io/title: Verify Image Signatures
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Ensures all images are signed and verified before deployment
+spec:
+  validationFailureAction: {{ .Values.security.kyverno.validationFailureAction }}
+  background: false
+  rules:
+  - name: verify-signature
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - {{ .Release.Namespace }}
+    verifyImages:
+    {{- range .Values.security.kyverno.trustedRegistries }}
+    - imageReferences:
+      - "{{ . }}/*"
+      {{- if $.Values.security.kyverno.cosign.keyless }}
+      attestors:
+      - entries:
+        - keyless:
+            subject: "{{ $.Values.security.kyverno.cosign.subject }}"
+            issuer: "{{ $.Values.security.kyverno.cosign.issuer }}"
+            rekor:
+              url: {{ $.Values.security.kyverno.cosign.rekorURL }}
+      {{- else }}
+      attestors:
+      - entries:
+        - keys:
+            publicKeys: |-
+{{ $.Values.security.kyverno.cosign.publicKey | indent 14 }}
+      {{- end }}
+    {{- end }}
+
+---
+# Disallow privileged containers
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-disallow-privileged
+  annotations:
+    policies.kyverno.io/title: Disallow Privileged Containers
+    policies.kyverno.io/category: Pod Security Standards (Baseline)
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: {{ .Values.security.kyverno.validationFailureAction }}
+  background: true
+  rules:
+  - name: privileged-containers
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - {{ .Release.Namespace }}
+    validate:
+      message: "Privileged mode is disallowed"
+      pattern:
+        spec:
+          containers:
+          - =(securityContext):
+              =(privileged): false
+
+---
+# Require read-only root filesystem
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-require-ro-rootfs
+  annotations:
+    policies.kyverno.io/title: Require Read-Only Root Filesystem
+    policies.kyverno.io/category: Security Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: {{ .Values.security.kyverno.validationFailureAction }}
+  background: true
+  rules:
+  - name: readonly-root-filesystem
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - {{ .Release.Namespace }}
+    validate:
+      message: "Root filesystem must be read-only"
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              readOnlyRootFilesystem: true
+
+---
+# Disallow latest image tag
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: {{ .Values.security.kyverno.validationFailureAction }}
+  background: true
+  rules:
+  - name: require-image-tag
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - {{ .Release.Namespace }}
+    validate:
+      message: "Using 'latest' tag is not allowed"
+      pattern:
+        spec:
+          containers:
+          - image: "!*:latest"
+
+---
+# Require resource limits
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-require-limits
+  annotations:
+    policies.kyverno.io/title: Require Resource Limits
+    policies.kyverno.io/category: Resource Management
+    policies.kyverno.io/severity: medium
+spec:
+  validationFailureAction: {{ .Values.security.kyverno.validationFailureAction }}
+  background: true
+  rules:
+  - name: require-cpu-memory-limits
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - {{ .Release.Namespace }}
+    validate:
+      message: "CPU and memory limits are required"
+      pattern:
+        spec:
+          containers:
+          - resources:
+              limits:
+                memory: "?*"
+                cpu: "?*"
+{{- end }}

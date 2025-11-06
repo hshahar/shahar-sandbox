@@ -1,0 +1,149 @@
+{{- $envName := .Values.environment }}
+{{- $frontendSvc := printf "%s-frontend" (include "microservices-app.fullname" .) }}
+{{- $backendSvc := printf "%s-backend" (include "microservices-app.fullname" .) }}
+{{- $dbSvc := printf "%s-postgresql" (include "microservices-app.fullname" .) }}
+
+✨ Thank you for installing {{ .Chart.Name }}!
+
+═══════════════════════════════════════════════════════════════════
+
+Environment: {{ .Values.environment | upper }}
+Release Name: {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+═══════════════════════════════════════════════════════════════════
+
+📦 Deployed Components:
+
+{{- if .Values.frontend.enabled }}
+  ✅ Frontend ({{ .Values.frontend.replicas }} replica(s))
+{{- end }}
+{{- if .Values.backend.enabled }}
+  ✅ Backend API ({{ .Values.backend.replicas }} replica(s))
+{{- end }}
+{{- if .Values.postgresql.enabled }}
+  ✅ PostgreSQL Database
+{{- end }}
+{{- if .Values.backend.autoscaling.enabled }}
+  ✅ Horizontal Pod Autoscaler ({{ .Values.backend.autoscaling.minReplicas }}-{{ .Values.backend.autoscaling.maxReplicas }} replicas)
+{{- end }}
+{{- if .Values.ingress.enabled }}
+  ✅ Ingress ({{ .Values.ingress.host }})
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+🔍 To check the status of your deployment:
+
+  kubectl get all -n {{ .Release.Namespace }}
+  kubectl get pods -n {{ .Release.Namespace }}
+  kubectl get ingress -n {{ .Release.Namespace }}
+
+═══════════════════════════════════════════════════════════════════
+
+🌐 Access your application:
+
+{{- if .Values.ingress.enabled }}
+
+1. Add this line to your hosts file:
+   (C:\Windows\System32\drivers\etc\hosts on Windows)
+   
+   127.0.0.1 {{ .Values.ingress.host }}
+
+2. Access the application:
+   
+   http://{{ .Values.ingress.host }}
+
+{{- else }}
+
+Use port-forward to access services:
+
+  # Frontend
+  kubectl port-forward -n {{ .Release.Namespace }} service/{{ $frontendSvc }} 8080:80
+  # Access at: http://localhost:8080
+
+{{- if .Values.backend.enabled }}
+  # Backend API
+  kubectl port-forward -n {{ .Release.Namespace }} service/{{ $backendSvc }} 8000:{{ .Values.backend.service.port }}
+  # Access at: http://localhost:8000
+{{- end }}
+
+{{- end }}
+
+{{- if .Values.postgresql.enabled }}
+
+═══════════════════════════════════════════════════════════════════
+
+💾 Database Connection:
+
+  Host: {{ $dbSvc }}.{{ .Release.Namespace }}.svc.cluster.local
+  Port: 5432
+  Database: {{ .Values.postgresql.database }}
+  Username: {{ .Values.secrets.database.username }}
+
+To connect from outside the cluster:
+
+  kubectl port-forward -n {{ .Release.Namespace }} service/{{ $dbSvc }} 5432:5432
+  
+Then connect to: localhost:5432
+
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+📋 Useful commands:
+
+  # View logs
+  kubectl logs -n {{ .Release.Namespace }} -l app=frontend -f
+  kubectl logs -n {{ .Release.Namespace }} -l app=backend -f
+
+  # Describe pods
+  kubectl describe pods -n {{ .Release.Namespace }}
+
+  # Get events
+  kubectl get events -n {{ .Release.Namespace }} --sort-by='.lastTimestamp'
+
+  # Scale deployment
+  kubectl scale deployment {{ include "microservices-app.fullname" . }}-backend -n {{ .Release.Namespace }} --replicas=3
+
+{{- if .Values.backend.autoscaling.enabled }}
+  # Check HPA status
+  kubectl get hpa -n {{ .Release.Namespace }}
+  kubectl describe hpa {{ include "microservices-app.fullname" . }}-backend-hpa -n {{ .Release.Namespace }}
+{{- end }}
+
+═══════════════════════════════════════════════════════════════════
+
+🔧 Management:
+
+  # Update release
+  helm upgrade {{ .Release.Name }} . -f values-{{ .Values.environment }}.yaml -n {{ .Release.Namespace }}
+
+  # Rollback
+  helm rollback {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  # View history
+  helm history {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+  # Uninstall
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+═══════════════════════════════════════════════════════════════════
+
+{{- if eq .Values.environment "prod" }}
+
+⚠️  PRODUCTION ENVIRONMENT NOTES:
+
+  • Ensure you've changed the default secrets!
+  • Consider using external secrets management (Vault, Key Vault)
+  • Enable TLS/SSL for ingress
+  • Set up monitoring and alerting
+  • Configure backups for the database
+  • Review and adjust resource limits based on actual usage
+
+{{- end }}
+
+Happy deploying! 🚀
+
+For more information, visit:
+  https://github.com/yourusername/microservices-k8s

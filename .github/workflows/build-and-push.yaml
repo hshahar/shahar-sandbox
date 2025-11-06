@@ -1,0 +1,200 @@
+name: Build and Push Images for ArgoCD
+
+on:
+  push:
+    branches: [develop, staging, main]
+    paths:
+      - 'app/**'
+      - 'helm/microservices-app/**'
+  pull_request:
+    branches: [develop, staging, main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  validate:
+    name: Validate Helm Charts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.13.0
+
+      - name: Lint Helm charts
+        run: |
+          helm lint helm/microservices-app
+          helm lint helm/microservices-app --values helm/microservices-app/values-dev.yaml
+          helm lint helm/microservices-app --values helm/microservices-app/values-staging.yaml
+          helm lint helm/microservices-app --values helm/microservices-app/values-prod.yaml
+
+      - name: Helm template test
+        run: |
+          helm template k8s-blog ./helm/microservices-app --values helm/microservices-app/values-dev.yaml
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+      packages: write
+    
+    outputs:
+      image_tag: ${{ steps.tags.outputs.tag }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine image tags
+        id: tags
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          SHA_SHORT=$(echo $GITHUB_SHA | cut -c1-7)
+          TAG="${BRANCH}-${SHA_SHORT}"
+          
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "backend_tag=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${TAG}" >> $GITHUB_OUTPUT
+          echo "frontend_tag=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${TAG}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app/backend
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.backend_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${{ steps.tags.outputs.branch }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app/frontend
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.frontend_tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${{ steps.tags.outputs.branch }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  update-manifests:
+    name: Update Helm Values for ArgoCD
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update Helm values
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          SHA_SHORT=$(echo $GITHUB_SHA | cut -c1-7)
+          TAG="${BRANCH}-${SHA_SHORT}"
+          
+          # Determine values file based on branch
+          if [ "$BRANCH" == "develop" ]; then
+            VALUES_FILE="helm/microservices-app/values-dev.yaml"
+          elif [ "$BRANCH" == "staging" ]; then
+            VALUES_FILE="helm/microservices-app/values-staging.yaml"
+          elif [ "$BRANCH" == "main" ]; then
+            VALUES_FILE="helm/microservices-app/values-prod.yaml"
+          else
+            echo "Unknown branch: $BRANCH"
+            exit 0
+          fi
+          
+          echo "Updating $VALUES_FILE with tag: $TAG"
+          
+          # Update image tags
+          yq eval -i ".backend.image.tag = \"$TAG\"" $VALUES_FILE
+          yq eval -i ".frontend.image.tag = \"$TAG\"" $VALUES_FILE
+          
+          # Show diff
+          git diff $VALUES_FILE
+
+      - name: Commit and push updated values
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          SHA_SHORT=$(echo $GITHUB_SHA | cut -c1-7)
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add helm/microservices-app/values-*.yaml
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git commit -m "chore: update image tags to ${TAG} [skip ci]"
+          git push origin HEAD:${BRANCH}
+
+  notify-argocd:
+    name: Notify ArgoCD
+    runs-on: ubuntu-latest
+    needs: update-manifests
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Trigger ArgoCD sync (webhook)
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          
+          if [ "$BRANCH" == "develop" ]; then
+            APP_NAME="k8s-blog-dev"
+          elif [ "$BRANCH" == "staging" ]; then
+            APP_NAME="k8s-blog-staging"
+          elif [ "$BRANCH" == "main" ]; then
+            APP_NAME="k8s-blog-prod"
+          else
+            echo "No ArgoCD app for branch: $BRANCH"
+            exit 0
+          fi
+          
+          echo "ArgoCD will auto-sync $APP_NAME within 3 minutes"
+          echo "Or manually sync: argocd app sync $APP_NAME"
+          
+          # Optional: Use ArgoCD webhook if configured
+          # curl -X POST https://argocd.example.com/api/webhook \
+          #   -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+          #   -d '{"app": "'$APP_NAME'"}'

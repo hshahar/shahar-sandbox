@@ -1,0 +1,142 @@
+# Production Environment Values
+
+environment: prod
+namespace: sha-production
+
+# Vault integration - Enabled for production
+vault:
+  enabled: true
+  refreshInterval: "1h"
+
+# Argo Rollouts - Enabled with conservative strategy
+argoRollouts:
+  enabled: true
+  canary:
+    pauseDuration:
+      step1: "5m"    # Conservative rollout
+      step2: "10m"
+      step3: "15m"
+  analysis:
+    successRate:
+      threshold: 99
+      count: 10
+      failureLimit: 1
+    latency:
+      threshold: 200
+      count: 10
+      failureLimit: 1
+    resources:
+      cpuThreshold: 70
+      memoryThreshold: 75
+      count: 8
+      failureLimit: 1
+    uptime:
+      threshold: 99.9
+      count: 10
+      failureLimit: 0
+
+# Monitoring - Enabled with production-grade thresholds
+monitoring:
+  enabled: true
+  alerts:
+    errorRate:
+      threshold: 1
+    latencyP95:
+      threshold: 300
+
+# Frontend configuration
+frontend:
+  enabled: true
+  replicas: 3
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Backend configuration
+backend:
+  enabled: true
+  replicas: 3
+  image:
+    repository: hashicorp/http-echo
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+  database: sha_blog_production
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  persistence:
+    size: 20Gi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: sha.blog.local
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  tls:
+    enabled: false  # Set to true in real production with valid cert
+
+# Secrets - IMPORTANT: Change these in production!
+secrets:
+  database:
+    username: "produser"
+    password: "CHANGE-ME-IN-PRODUCTION-USE-VAULT"
+  backend:
+    apiKey: "CHANGE-ME-IN-PRODUCTION-USE-VAULT"
+
+# Security Configuration - PRODUCTION HARDENING
+security:
+  userNamespaces:
+    enabled: true  # Strongly recommended for production
+  kyverno:
+    enabled: true
+    validationFailureAction: enforce  # STRICT mode in production
+    trustedRegistries:
+      - "your-registry.io"  # Only trust your registry
+    cosign:
+      keyless: true
+      issuer: "https://token.actions.githubusercontent.com"
+      subject: "https://github.com/yourusername/yourrepo/.github/workflows/*"
+
+# Network Policy - STRICT in production
+networkPolicy:
+  enabled: true
+  allowExternalEgress: false  # Deny by default, whitelist specific endpoints

@@ -1,0 +1,80 @@
+{{- if .Values.autoscaling.enabled }}
+{{- if eq .Values.autoscaling.type "keda" }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-frontend-scaledobject
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "microservices-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  scaleTargetRef:
+    name: {{ include "microservices-app.fullname" . }}-frontend
+  minReplicaCount: {{ .Values.frontend.autoscaling.minReplicas | default 1 }}
+  maxReplicaCount: {{ .Values.frontend.autoscaling.maxReplicas | default 10 }}
+  pollingInterval: {{ .Values.frontend.autoscaling.pollingInterval | default 30 }}
+  cooldownPeriod: {{ .Values.frontend.autoscaling.cooldownPeriod | default 300 }}
+  
+  triggers:
+  {{- if .Values.frontend.autoscaling.cpu.enabled }}
+  # CPU-based scaling
+  - type: cpu
+    metricType: Utilization
+    metadata:
+      value: {{ .Values.frontend.autoscaling.cpu.targetUtilization | quote }}
+  {{- end }}
+  
+  {{- if .Values.frontend.autoscaling.memory.enabled }}
+  # Memory-based scaling
+  - type: memory
+    metricType: Utilization
+    metadata:
+      value: {{ .Values.frontend.autoscaling.memory.targetUtilization | quote }}
+  {{- end }}
+  
+  {{- if .Values.frontend.autoscaling.prometheus.enabled }}
+  # Prometheus metrics-based scaling (HTTP requests)
+  - type: prometheus
+    metadata:
+      serverAddress: {{ .Values.frontend.autoscaling.prometheus.serverAddress }}
+      metricName: http_requests_per_second
+      query: |
+        sum(rate(nginx_http_requests_total{
+          namespace="{{ .Values.namespace }}",
+          service="{{ include "microservices-app.fullname" . }}-frontend"
+        }[2m]))
+      threshold: {{ .Values.frontend.autoscaling.prometheus.threshold | quote }}
+  {{- end }}
+  
+  {{- if .Values.frontend.autoscaling.custom }}
+  # Custom triggers from values
+  {{- toYaml .Values.frontend.autoscaling.custom | nindent 2 }}
+  {{- end }}
+
+  advanced:
+    restoreToOriginalReplicaCount: {{ .Values.frontend.autoscaling.restoreToOriginalReplicaCount | default false }}
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: {{ .Values.frontend.autoscaling.scaleDown.stabilizationWindowSeconds | default 300 }}
+          policies:
+          - type: Percent
+            value: {{ .Values.frontend.autoscaling.scaleDown.percentagePolicyValue | default 50 }}
+            periodSeconds: {{ .Values.frontend.autoscaling.scaleDown.percentagePolicyPeriod | default 60 }}
+          - type: Pods
+            value: {{ .Values.frontend.autoscaling.scaleDown.podsPolicyValue | default 2 }}
+            periodSeconds: {{ .Values.frontend.autoscaling.scaleDown.podsPolicyPeriod | default 60 }}
+          selectPolicy: {{ .Values.frontend.autoscaling.scaleDown.selectPolicy | default "Min" }}
+        scaleUp:
+          stabilizationWindowSeconds: {{ .Values.frontend.autoscaling.scaleUp.stabilizationWindowSeconds | default 0 }}
+          policies:
+          - type: Percent
+            value: {{ .Values.frontend.autoscaling.scaleUp.percentagePolicyValue | default 100 }}
+            periodSeconds: {{ .Values.frontend.autoscaling.scaleUp.percentagePolicyPeriod | default 30 }}
+          - type: Pods
+            value: {{ .Values.frontend.autoscaling.scaleUp.podsPolicyValue | default 4 }}
+            periodSeconds: {{ .Values.frontend.autoscaling.scaleUp.podsPolicyPeriod | default 30 }}
+          selectPolicy: {{ .Values.frontend.autoscaling.scaleUp.selectPolicy | default "Max" }}
+{{- end }}
+{{- end }}

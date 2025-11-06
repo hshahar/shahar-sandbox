@@ -1,0 +1,55 @@
+# Development Environment Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sha-k8s-blog-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/yourusername/k8s-blog-platform.git  # Change to your repo
+    targetRevision: HEAD
+    path: helm/microservices-app
+    helm:
+      releaseName: sha-k8s-blog-dev
+      valueFiles:
+        - values-dev.yaml
+      parameters:
+        - name: environment
+          value: "dev"
+        - name: frontend.replicas
+          value: "1"
+        - name: backend.replicas
+          value: "1"
+        - name: postgresql.persistence.size
+          value: "1Gi"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sha-dev
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  # Health check and sync wave
+  syncWave: 10
+  
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore HPA-managed replicas

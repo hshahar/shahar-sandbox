@@ -1,0 +1,102 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-postgres-backup
+  labels:
+    {{- include "microservices-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.postgresql.backup.schedule | quote }}
+  successfulJobsHistoryLimit: {{ .Values.postgresql.backup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.postgresql.backup.failedJobsHistoryLimit }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "microservices-app.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "microservices-app.fullname" . }}-backup
+          containers:
+          - name: backup
+            image: {{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}
+            imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Starting PostgreSQL backup at $(date)"
+
+              BACKUP_FILE="/backups/backup-$(date +%Y%m%d-%H%M%S).sql.gz"
+
+              # Create backup
+              PGPASSWORD="${POSTGRES_PASSWORD}" pg_dump \
+                -h {{ include "microservices-app.fullname" . }}-postgresql \
+                -U "${POSTGRES_USER}" \
+                -d "${POSTGRES_DB}" \
+                | gzip > "${BACKUP_FILE}"
+
+              echo "Backup completed: ${BACKUP_FILE}"
+              echo "Backup size: $(du -h ${BACKUP_FILE} | cut -f1)"
+
+              # Cleanup old backups (keep last N backups based on retention)
+              echo "Cleaning up old backups (keeping last {{ .Values.postgresql.backup.retention }})"
+              cd /backups
+              ls -t backup-*.sql.gz | tail -n +{{ add1 .Values.postgresql.backup.retention }} | xargs -r rm -v
+
+              echo "Backup process completed at $(date)"
+            env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-app.fullname" . }}-secrets
+                  key: db-username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-app.fullname" . }}-secrets
+                  key: db-password
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.database | quote }}
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            {{- with .Values.postgresql.backup.resources }}
+            resources:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: {{ include "microservices-app.fullname" . }}-postgres-backup
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-postgres-backup
+  labels:
+    {{- include "microservices-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.postgresql.backup.storageClass }}
+  storageClassName: {{ .Values.postgresql.backup.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.backup.storageSize }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-backup
+  labels:
+    {{- include "microservices-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+{{- end }}
