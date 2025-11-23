@@ -395,6 +395,12 @@ function App() {
               <a href="/ai/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🤖 AI Agent
               </a>
+              <span className="service-link service-link-disabled" title="Grafana available via port-forward: kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80">
+                📈 Grafana (Internal)
+              </span>
+              <span className="service-link service-link-disabled" title="ArgoCD available via port-forward: kubectl port-forward -n argocd svc/argocd-server 8080:443">
+                🚀 ArgoCD (Internal)
+              </span>
               <span className="service-link service-link-disabled" title="Vault available via port-forward: kubectl port-forward -n vault svc/vault 8200:8200">
                 🔐 Vault (Internal)
               </span>
