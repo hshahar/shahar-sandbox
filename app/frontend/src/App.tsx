@@ -395,7 +395,7 @@ function App() {
               <a href="/ai/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🤖 AI Agent
               </a>
-              <a href="/vault/" target="_blank" rel="noopener noreferrer" className="service-link">
+              <a href="/vault/ui/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🔐 Vault
               </a>
               <a href="/grafana/" target="_blank" rel="noopener noreferrer" className="service-link">

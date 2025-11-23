@@ -47,6 +47,34 @@ spec:
   - matches:
     - path:
         type: PathPrefix
+        value: /grafana
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: prometheus-grafana
+      namespace: monitoring
+      port: 80
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /argocd
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
+    backendRefs:
+    - name: argocd-server
+      namespace: argocd
+      port: 443
+  - matches:
+    - path:
+        type: PathPrefix
         value: /
     backendRefs:
     - name: {{ include "microservices-app.fullname" . }}-frontend
