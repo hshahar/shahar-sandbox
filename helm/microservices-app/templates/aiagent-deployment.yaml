@@ -28,7 +28,7 @@ spec:
           protocol: TCP
         env:
         - name: DATABASE_URL
-          value: "postgresql://{{ .Values.secrets.database.username }}:{{ .Values.secrets.database.password }}@{{ include "microservices-app.fullname" . }}-postgres:5432/{{ .Values.postgresql.database }}"
+          value: "postgresql://{{ .Values.secrets.database.username }}:{{ .Values.secrets.database.password }}@{{ include "microservices-app.fullname" . }}-postgresql:5432/{{ .Values.postgresql.database }}"
         - name: MODEL_PROVIDER
           value: {{ .Values.aiAgent.modelProvider | quote }}
         - name: OLLAMA_BASE_URL
