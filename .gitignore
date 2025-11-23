@@ -28,6 +28,11 @@ Thumbs.db
 secrets/
 *.key
 *.pem
+.aws/
+credentials
+.env
+.env.*
+*.credentials
 
 # Local kubeconfig
 kubeconfig
