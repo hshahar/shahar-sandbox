@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      serviceAccountName: vault-init
+      containers:
+      - name: vault-init
+        image: hashicorp/vault:1.15
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Vault to be ready
+          until vault status > /dev/null 2>&1; do
+            echo "Waiting for Vault..."
+            sleep 5
+          done
+          
+          # Enable Kubernetes auth if not already enabled
+          vault auth enable kubernetes 2>/dev/null || true
+          
+          # Configure Kubernetes auth
+          vault write auth/kubernetes/config \
+            kubernetes_host="https://kubernetes.default.svc:443"
+          
+          # Create secrets
+          vault kv put secret/sha-dev/database \
+            username=shadbuser \
+            password=ShaDBPass2024! \
+            host=sha-blog-dev-sha-microservices-app-postgresql \
+            port=5432 \
+            database=blogdb
+          
+          vault kv put secret/sha-dev/jwt \
+            jwt_secret=sha-super-secret-jwt-key-2024-dev-environment
+          
+          # Create policy
+          vault policy write sha-dev - <<EOF
+          path "secret/data/sha-dev/*" {
+            capabilities = ["read", "list"]
+          }
+          EOF
+          
+          # Create Kubernetes role
+          vault write auth/kubernetes/role/sha-dev \
+            bound_service_account_names=default \
+            bound_service_account_namespaces=sha-dev \
+            policies=sha-dev \
+            ttl=24h
+          
+          echo "Vault initialized successfully"
+        env:
+        - name: VAULT_ADDR
+          value: "http://vault:8200"
+        - name: VAULT_TOKEN
+          value: "root"
+      restartPolicy: OnFailure
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-init
+  namespace: vault
