@@ -165,12 +165,12 @@ aiAgent:
     storageClass: "ebs-gp3"  # Use EBS storage class for EKS
   resources:
     limits:
-      cpu: 2000m
-      memory: 6Gi
+      cpu: 3000m
+      memory: 12Gi
     requests:
-      cpu: 1000m
-      memory: 3Gi
-  modelProvider: "ollama"  # Use Ollama instead of OpenAI
+      cpu: 2000m
+      memory: 8Gi
+  modelProvider: "ollama"  # Use Ollama with t3.xlarge nodes (16GB RAM)
   ollama:
     baseUrl: "http://ollama:11434"
     model: "mistral:7b-instruct-q4_0"
