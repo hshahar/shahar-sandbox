@@ -13,6 +13,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "microservices-app.labels" . | nindent 4 }}
+  annotations:
+    # Envoy Gateway infrastructure annotations for AWS NLB
+    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
   gatewayClassName: eg
   listeners:
