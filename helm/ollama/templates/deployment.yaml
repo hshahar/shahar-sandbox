@@ -35,7 +35,7 @@ spec:
         {{- if .Values.gpu.enabled }}
         resources:
           limits:
-            nvidia.com/gpu: {{ .Values.gpu.nvidia.com/gpu }}
+            nvidia.com/gpu: {{ .Values.gpu.count }}
         {{- end }}
 
         env:

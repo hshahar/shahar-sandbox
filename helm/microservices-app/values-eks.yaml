@@ -155,12 +155,28 @@ postgresql:
 # AI Agent configuration
 aiAgent:
   enabled: true
+  replicas: 1
   image:
     repository: 179580348028.dkr.ecr.us-west-2.amazonaws.com/sha-blog-ai-agent
-    tag: "v1.0"
+    tag: "v2.0"
     pullPolicy: IfNotPresent
   persistence:
+    enabled: true
     storageClass: "ebs-gp3"  # Use EBS storage class for EKS
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  modelProvider: "ollama"  # Use Ollama instead of OpenAI
+  ollama:
+    baseUrl: "http://ollama:11434"
+    model: "llama3"
+  openai:
+    apiKey: ""
+    model: "gpt-4-turbo-preview"
 
 # Gateway API configuration - Using Envoy Gateway
 gateway:

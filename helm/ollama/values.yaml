@@ -11,21 +11,19 @@ service:
   type: ClusterIP
   port: 11434
 
-# Resource limits
+# Resource limits - reduced for dev cluster
 resources:
   requests:
+    memory: "1Gi"
+    cpu: "500m"
+  limits:
     memory: "2Gi"
     cpu: "1000m"
-  limits:
-    memory: "8Gi"
-    cpu: "4000m"
 
 # GPU support (optional - enable if you have GPU nodes)
 gpu:
   enabled: false
-  # If enabled, requires nvidia-device-plugin in cluster
-  nvidia:
-    com/gpu: 1
+  count: 1
 
 # Persistence for models
 persistence:

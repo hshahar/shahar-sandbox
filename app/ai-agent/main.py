@@ -15,6 +15,7 @@ import logging
 
 # LangChain imports
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.llms import Ollama
 from langchain_community.vectorstores import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
@@ -32,14 +33,22 @@ app = FastAPI(
 # Configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@postgresql:5432/blogdb")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")  # "ollama" or "openai"
 VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", "./chroma_db")
 
-# Initialize LLM and embeddings
-if OPENAI_API_KEY:
+# Initialize LLM and embeddings based on provider
+if LLM_PROVIDER == "ollama":
+    logger.info(f"Initializing Ollama LLM: {OLLAMA_BASE_URL} with model {OLLAMA_MODEL}")
+    llm = Ollama(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL)
+    embeddings = None  # Ollama doesn't provide embeddings API yet
+elif OPENAI_API_KEY:
+    logger.info("Initializing OpenAI LLM")
     llm = ChatOpenAI(model="gpt-4-turbo-preview", temperature=0.3)
     embeddings = OpenAIEmbeddings()
 else:
-    logger.warning("No OPENAI_API_KEY found. Agent will run in demo mode.")
+    logger.warning("No LLM provider configured. Agent will run in demo mode.")
     llm = None
     embeddings = None
 
@@ -172,8 +181,22 @@ async def analyze_with_llm(post: Dict) -> Dict:
 
     # Get LLM response
     try:
-        response = llm.invoke(prompt)
-        result = json.loads(response.content)
+        if LLM_PROVIDER == "ollama":
+            # Ollama returns string directly
+            response_text = llm.invoke(prompt)
+            # Try to extract JSON from response
+            import re
+            json_match = re.search(r'\{[^}]+\}', response_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                logger.error(f"Could not extract JSON from Ollama response: {response_text[:200]}")
+                raise ValueError("Invalid JSON response from Ollama")
+        else:
+            # OpenAI returns object with .content
+            response = llm.invoke(prompt)
+            result = json.loads(response.content)
+        
         return result
     except Exception as e:
         logger.error(f"LLM analysis error: {e}")
@@ -241,7 +264,10 @@ async def root():
         "service": "AI RAG Agent",
         "version": "1.0.0",
         "status": "running",
-        "llm_enabled": llm is not None
+        "llm_enabled": llm is not None,
+        "llm_provider": LLM_PROVIDER if llm else "none",
+        "ollama_url": OLLAMA_BASE_URL if LLM_PROVIDER == "ollama" else None,
+        "ollama_model": OLLAMA_MODEL if LLM_PROVIDER == "ollama" else None
     }
 
 @app.get("/health")

@@ -395,13 +395,13 @@ function App() {
               <a href="/ai/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🤖 AI Agent
               </a>
-              <a href="/vault/ui/" target="_blank" rel="noopener noreferrer" className="service-link">
+              <a href="http://k8s-vault-vaultext-7b536df382-13e4d924c9156bde.elb.us-west-2.amazonaws.com/ui/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🔐 Vault
               </a>
-              <a href="/grafana/" target="_blank" rel="noopener noreferrer" className="service-link">
+              <a href="http://k8s-monitori-grafanae-d7686f38ff-65d9a249b9c85285.elb.us-west-2.amazonaws.com/" target="_blank" rel="noopener noreferrer" className="service-link">
                 📈 Grafana
               </a>
-              <a href="/argocd/" target="_blank" rel="noopener noreferrer" className="service-link">
+              <a href="http://k8s-argocd-argocdex-0526f8f855-f9ea856bd289fe78.elb.us-west-2.amazonaws.com/" target="_blank" rel="noopener noreferrer" className="service-link">
                 🚀 ArgoCD
               </a>
             </div>
