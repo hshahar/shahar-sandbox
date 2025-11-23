@@ -2,20 +2,20 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ include "sha-microservices-app.fullname" . }}-frontend-route
+  name: {{ include "microservices-app.fullname" . }}-frontend-route
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "sha-microservices-app.labels" . | nindent 4 }}
+    {{- include "microservices-app.labels" . | nindent 4 }}
 spec:
   parentRefs:
-  - name: {{ include "sha-microservices-app.fullname" . }}-gateway
+  - name: {{ include "microservices-app.fullname" . }}-gateway
   rules:
   - matches:
     - path:
         type: PathPrefix
         value: /api
     backendRefs:
-    - name: {{ include "sha-microservices-app.fullname" . }}-backend
+    - name: {{ include "microservices-app.fullname" . }}-backend
       port: {{ .Values.backend.service.port }}
   - matches:
     - path:
@@ -29,6 +29,6 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: {{ include "sha-microservices-app.fullname" . }}-frontend
+    - name: {{ include "microservices-app.fullname" . }}-frontend
       port: {{ .Values.frontend.service.port }}
 {{- end }}

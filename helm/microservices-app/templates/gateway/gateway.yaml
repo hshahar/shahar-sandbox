@@ -9,10 +9,10 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ include "sha-microservices-app.fullname" . }}-gateway
+  name: {{ include "microservices-app.fullname" . }}-gateway
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "sha-microservices-app.labels" . | nindent 4 }}
+    {{- include "microservices-app.labels" . | nindent 4 }}
 spec:
   gatewayClassName: eg
   listeners:
