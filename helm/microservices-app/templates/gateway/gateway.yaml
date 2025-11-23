@@ -5,6 +5,11 @@ metadata:
   name: eg
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: {{ include "microservices-app.fullname" . }}-proxy-config
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -13,11 +18,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "microservices-app.labels" . | nindent 4 }}
-  annotations:
-    # Envoy Gateway infrastructure annotations for AWS NLB
-    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-type: "external"
-    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
-    gateway.envoyproxy.io/infra-annotation-service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
   gatewayClassName: eg
   listeners:
