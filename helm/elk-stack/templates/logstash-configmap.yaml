@@ -98,13 +98,15 @@ data:
     }
 
     output {
-      elasticsearch {
-        hosts => ["http://elasticsearch:9200"]
-        index => "k8s-logs-%{+YYYY.MM.dd}"
-
-        # Create separate indices per namespace
-        if [k8s_namespace] {
+      if [k8s_namespace] {
+        elasticsearch {
+          hosts => ["http://elasticsearch:9200"]
           index => "k8s-%{k8s_namespace}-%{+YYYY.MM.dd}"
+        }
+      } else {
+        elasticsearch {
+          hosts => ["http://elasticsearch:9200"]
+          index => "k8s-logs-%{+YYYY.MM.dd}"
         }
       }
 
