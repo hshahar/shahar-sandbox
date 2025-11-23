@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ai-agent.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ai-agent
+    component: ai-scoring
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: ai-agent

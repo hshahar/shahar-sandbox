@@ -26,6 +26,7 @@ spec:
       {{- if .Values.security.userNamespaces.enabled }}
       hostUsers: false
       {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds | default 60 }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -73,11 +74,29 @@ spec:
         - name: DATABASE_URL
           value: "postgresql://$(DATABASE_USER):$(DATABASE_PASSWORD)@{{ include "microservices-app.fullname" . }}-postgresql:5432/{{ .Values.postgresql.database }}"
         {{- end }}
+        {{- if .Values.backend.aiAgent.enabled }}
+        - name: AI_AGENT_URL
+          value: {{ .Values.backend.aiAgent.url | quote }}
+        - name: AI_SCORING_ENABLED
+          value: "true"
+        {{- else }}
+        - name: AI_SCORING_ENABLED
+          value: "false"
+        {{- end }}
         - name: API_KEY
           valueFrom:
             secretKeyRef:
               name: {{ include "microservices-app.fullname" . }}-secrets
               key: api-key
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                # Sleep to allow load balancer to remove pod from endpoints
+                sleep {{ .Values.backend.preStopSleepSeconds | default 10 }}
         livenessProbe:
           httpGet:
             path: /health
@@ -88,7 +107,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: http
           initialDelaySeconds: 15
           periodSeconds: 5

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: ollama
+description: Ollama - Run local LLMs in Kubernetes
+type: application
+version: 1.0.0
+appVersion: "0.1.26"
+keywords:
+  - ollama
+  - llm
+  - ai
+  - machine-learning
+home: https://ollama.ai
+sources:
+  - https://github.com/ollama/ollama
+maintainers:
+  - name: SHA
+    email: sha@example.com

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ollama.fullname" . }}
+  labels:
+    app: ollama
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+      - name: ollama
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 11434
+          protocol: TCP
+
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+        {{- end }}
+
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+
+        {{- if .Values.gpu.enabled }}
+        resources:
+          limits:
+            nvidia.com/gpu: {{ .Values.gpu.nvidia.com/gpu }}
+        {{- end }}
+
+        env:
+        {{- range .Values.env }}
+        - name: {{ .name }}
+          value: {{ .value | quote }}
+        {{- end }}
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      # Init container to pull models
+      initContainers:
+      - name: model-puller
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Start ollama in background
+          ollama serve &
+          OLLAMA_PID=$!
+
+          # Wait for ollama to be ready
+          echo "Waiting for Ollama to start..."
+          sleep 10
+
+          # Pull each model
+          {{- range .Values.models }}
+          echo "Pulling model: {{ . }}"
+          ollama pull {{ . }} || echo "Failed to pull {{ . }}"
+          {{- end }}
+
+          echo "Model pulling complete"
+          kill $OLLAMA_PID
+
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: ollama-data
+          mountPath: /root/.ollama
+        {{- end }}
+
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: ollama-data
+        persistentVolumeClaim:
+          claimName: {{ include "ollama.fullname" . }}-pvc
+      {{- end }}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

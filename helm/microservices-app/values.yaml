@@ -66,6 +66,13 @@ frontend:
   service:
     type: ClusterIP
     port: 80
+  # Graceful shutdown configuration
+  terminationGracePeriodSeconds: 30
+  preStopSleepSeconds: 5
+  # PodDisruptionBudget configuration
+  pdb:
+    enabled: true
+    minAvailable: 1
   resources:
     limits:
       cpu: 200m
@@ -116,6 +123,17 @@ backend:
   service:
     type: ClusterIP
     port: 8080
+  # AI Agent Integration
+  aiAgent:
+    enabled: true  # Enable real-time AI scoring
+    url: "http://ai-agent:8000"
+  # Graceful shutdown configuration
+  terminationGracePeriodSeconds: 60
+  preStopSleepSeconds: 10
+  # PodDisruptionBudget configuration
+  pdb:
+    enabled: true
+    minAvailable: 1
   resources:
     limits:
       cpu: 500m
@@ -189,6 +207,39 @@ postgresql:
       requests:
         cpu: 100m
         memory: 128Mi
+
+# AI Agent configuration (for automatic blog post scoring)
+aiAgent:
+  enabled: true
+  replicas: 1
+  image:
+    repository: sha-ai-agent
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  # Model provider: "ollama" (free, local) or "openai" (paid, cloud)
+  modelProvider: "ollama"  # Change to "openai" for better quality
+  # Ollama configuration (local model)
+  ollama:
+    baseUrl: "http://ollama:11434"
+    model: "llama3"  # Options: llama3, mistral, gemma, codellama
+  # OpenAI configuration (cloud model)
+  openai:
+    apiKey: ""  # Set via --set or secrets
+    model: "gpt-4-turbo-preview"  # Options: gpt-4-turbo-preview, gpt-3.5-turbo
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  persistence:
+    enabled: true  # For vector database
+    size: 5Gi
+    storageClass: ""  # Use default storage class
 
 # Ingress configuration
 ingress:

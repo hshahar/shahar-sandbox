@@ -3,7 +3,7 @@ Kubernetes Blog Platform - Backend API
 FastAPI application for managing blog posts about Kubernetes
 """
 
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, text
@@ -13,17 +13,74 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 import os
+import signal
+import asyncio
+import logging
+import json
+import httpx
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import time
 
+# JSON Logging Configuration
+class JSONFormatter(logging.Formatter):
+    """Custom JSON formatter for structured logging"""
+    def format(self, record):
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # Add extra fields
+        if hasattr(record, "request_id"):
+            log_data["request_id"] = record.request_id
+        if hasattr(record, "user_id"):
+            log_data["user_id"] = record.user_id
+        if hasattr(record, "http_method"):
+            log_data["http_method"] = record.http_method
+        if hasattr(record, "path"):
+            log_data["path"] = record.path
+        if hasattr(record, "status_code"):
+            log_data["status_code"] = record.status_code
+        if hasattr(record, "duration"):
+            log_data["duration"] = record.duration
+
+        return json.dumps(log_data)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+# Set JSON formatter for all handlers
+for handler in logging.root.handlers:
+    handler.setFormatter(JSONFormatter())
+
+logger = logging.getLogger(__name__)
+
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:postgres@postgresql:5432/blogdb"
 )
+
+# AI Agent configuration
+AI_AGENT_URL = os.getenv("AI_AGENT_URL", "http://ai-agent:8000")
+AI_SCORING_ENABLED = os.getenv("AI_SCORING_ENABLED", "true").lower() == "true"
 
 engine = create_engine(DATABASE_URL, pool_size=10, max_overflow=20, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -52,10 +109,14 @@ POSTS_TOTAL = Gauge(
 # Rate Limiter
 limiter = Limiter(key_func=get_remote_address)
 
+# Graceful Shutdown State
+is_shutting_down = False
+shutdown_event = asyncio.Event()
+
 # Database Models
 class BlogPost(Base):
     __tablename__ = "blog_posts"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
     content = Column(Text, nullable=False)
@@ -64,6 +125,8 @@ class BlogPost(Base):
     tags = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ai_score = Column(Integer, nullable=True)
+    last_scored_at = Column(DateTime, nullable=True)
 
 # Pydantic Models
 class BlogPostCreate(BaseModel):
@@ -82,6 +145,8 @@ class BlogPostResponse(BaseModel):
     tags: Optional[str]
     created_at: datetime
     updated_at: datetime
+    ai_score: Optional[int] = None
+    last_scored_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -105,6 +170,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Shutdown middleware - reject new requests during shutdown
+@app.middleware("http")
+async def shutdown_middleware(request: Request, call_next):
+    global is_shutting_down
+
+    if is_shutting_down and request.url.path not in ["/health", "/ready", "/metrics"]:
+        return Response(
+            content="Service is shutting down",
+            status_code=503,
+            headers={"Retry-After": "30"}
+        )
+
+    response = await call_next(request)
+    return response
+
+# Logging middleware
+@app.middleware("http")
+async def logging_middleware(request: Request, call_next):
+    start_time = time.time()
+
+    # Generate request ID
+    request_id = f"{int(start_time * 1000)}"
+
+    # Log request
+    logger.info(
+        "HTTP request received",
+        extra={
+            "request_id": request_id,
+            "http_method": request.method,
+            "path": str(request.url.path),
+            "client_ip": request.client.host if request.client else "unknown",
+            "user_agent": request.headers.get("user-agent", "unknown")
+        }
+    )
+
+    response = await call_next(request)
+
+    duration = time.time() - start_time
+
+    # Log response
+    logger.info(
+        "HTTP request completed",
+        extra={
+            "request_id": request_id,
+            "http_method": request.method,
+            "path": str(request.url.path),
+            "status_code": response.status_code,
+            "duration": round(duration * 1000, 2)  # milliseconds
+        }
+    )
+
+    return response
 
 # Metrics middleware
 @app.middleware("http")
@@ -133,17 +251,82 @@ def get_db():
         DB_CONNECTIONS.dec()
         db.close()
 
+# AI Scoring Functions
+async def trigger_ai_scoring(post_id: int):
+    """
+    Trigger AI scoring for a blog post in the background
+    Sends request to AI agent service
+    """
+    if not AI_SCORING_ENABLED:
+        logger.info(f"AI scoring disabled, skipping post {post_id}")
+        return
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{AI_AGENT_URL}/score",
+                json={"post_id": post_id}
+            )
+
+            if response.status_code == 200:
+                logger.info(
+                    f"AI scoring triggered successfully for post {post_id}",
+                    extra={"post_id": post_id, "ai_agent_response": response.json()}
+                )
+            else:
+                logger.warning(
+                    f"AI scoring request failed for post {post_id}: {response.status_code}",
+                    extra={"post_id": post_id, "status_code": response.status_code}
+                )
+    except httpx.TimeoutException:
+        logger.warning(f"AI scoring request timeout for post {post_id}", extra={"post_id": post_id})
+    except Exception as e:
+        logger.error(
+            f"Error triggering AI scoring for post {post_id}: {str(e)}",
+            extra={"post_id": post_id, "error": str(e)}
+        )
+
+# Signal handlers for graceful shutdown
+def handle_sigterm(signum, frame):
+    """Handle SIGTERM signal for graceful shutdown"""
+    global is_shutting_down
+    logger.warning(f"Received signal {signum}, starting graceful shutdown", extra={"signal": signum})
+    is_shutting_down = True
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, handle_sigterm)
+signal.signal(signal.SIGINT, handle_sigterm)
+
 # Create tables and update metrics
 @app.on_event("startup")
 async def startup():
+    logger.info("Application startup initiated")
     Base.metadata.create_all(bind=engine)
     # Initialize post count metric
     db = SessionLocal()
     try:
         count = db.query(BlogPost).count()
         POSTS_TOTAL.set(count)
+        logger.info(f"Application started successfully", extra={"total_posts": count})
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}", exc_info=True)
+        raise
     finally:
         db.close()
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Graceful shutdown - close database connections"""
+    global is_shutting_down
+    is_shutting_down = True
+    logger.info("Graceful shutdown initiated")
+
+    # Wait a bit for in-flight requests to complete
+    await asyncio.sleep(2)
+
+    # Close database connections
+    engine.dispose()
+    logger.info("Database connections closed, shutdown complete")
 
 # Health check
 @app.get("/health")
@@ -168,6 +351,12 @@ async def health_check():
 @app.get("/ready")
 async def readiness_check():
     """Readiness probe - checks if app is ready to serve traffic"""
+    global is_shutting_down
+
+    # Return not ready during shutdown
+    if is_shutting_down:
+        raise HTTPException(status_code=503, detail="Shutting down")
+
     try:
         db = SessionLocal()
         db.execute(text("SELECT 1"))
@@ -221,8 +410,13 @@ async def get_post(post_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/posts", response_model=BlogPostResponse, status_code=201)
 @limiter.limit("10/minute")
-async def create_post(request: Request, post: BlogPostCreate, db: Session = Depends(get_db)):
-    """Create a new blog post"""
+async def create_post(
+    request: Request,
+    post: BlogPostCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """Create a new blog post and trigger AI scoring"""
     db_post = BlogPost(**post.dict())
     db.add(db_post)
     db.commit()
@@ -230,6 +424,14 @@ async def create_post(request: Request, post: BlogPostCreate, db: Session = Depe
 
     # Update metrics
     POSTS_TOTAL.inc()
+
+    # Trigger AI scoring in background
+    background_tasks.add_task(trigger_ai_scoring, db_post.id)
+
+    logger.info(
+        f"Created new post {db_post.id}, AI scoring queued",
+        extra={"post_id": db_post.id, "title": db_post.title}
+    )
 
     return db_post
 
@@ -239,9 +441,10 @@ async def update_post(
     request: Request,
     post_id: int,
     post: BlogPostCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """Update a blog post"""
+    """Update a blog post and trigger AI re-scoring"""
     db_post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
 
     if not db_post:
@@ -253,6 +456,15 @@ async def update_post(
     db_post.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_post)
+
+    # Trigger AI re-scoring in background
+    background_tasks.add_task(trigger_ai_scoring, db_post.id)
+
+    logger.info(
+        f"Updated post {db_post.id}, AI re-scoring queued",
+        extra={"post_id": db_post.id, "title": db_post.title}
+    )
+
     return db_post
 
 @app.delete("/api/posts/{post_id}", status_code=204)

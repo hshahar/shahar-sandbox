@@ -1,0 +1,77 @@
+# Default values for AI RAG Agent
+
+namespace: sha-dev
+
+# Image configuration
+image:
+  repository: sha-ai-agent
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Replicas
+replicas: 1  # Only need 1 replica for AI agent
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+
+# Resources - COST OPTIMIZED
+resources:
+  requests:
+    cpu: 200m      # 0.2 CPU cores
+    memory: 512Mi  # 512 MB RAM
+  limits:
+    cpu: 500m      # Max 0.5 CPU cores
+    memory: 1Gi    # Max 1 GB RAM
+
+# OpenAI API Key (required for AI scoring)
+# Get your API key from: https://platform.openai.com/api-keys
+openai:
+  apiKey: ""  # Set this or use --set openai.apiKey=sk-...
+  # Alternative: Use existing secret
+  existingSecret: ""
+  existingSecretKey: "api-key"
+
+# Database configuration
+database:
+  # Connection string to PostgreSQL
+  url: "postgresql://app_user:devpass123@sha-blog-dev-pg-rw:5432/sha_blog_dev"
+  # For CloudNativePG: service name is <cluster-name>-rw for read-write
+
+# Vector Database (ChromaDB) storage
+vectorDb:
+  # Persistent volume for vector database
+  persistence:
+    enabled: true
+    size: 2Gi
+    storageClass: ""  # Use default storage class
+
+# Scheduled scoring (CronJob)
+cronJob:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  # Score new posts automatically
+  scoreNewPosts: true
+  # Score posts without scores
+  scoreUnscored: true
+
+# Health checks
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Service Monitor (for Prometheus)
+monitoring:
+  enabled: false
+  podMonitor: false

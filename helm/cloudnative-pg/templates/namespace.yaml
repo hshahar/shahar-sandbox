@@ -1,0 +1,9 @@
+{{- if .Values.operator.enabled }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.operator.namespace }}
+  labels:
+    name: {{ .Values.operator.namespace }}
+    purpose: database-operator
+{{- end }}

@@ -1,0 +1,44 @@
+{
+  "objects": [
+    {
+      "id": "k8s-logs-*",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "k8s-logs-*",
+        "timeFieldName": "@timestamp",
+        "fields": "[]",
+        "fieldFormatMap": "{}"
+      }
+    },
+    {
+      "id": "k8s-sha-dev-*",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "k8s-sha-dev-*",
+        "timeFieldName": "@timestamp",
+        "fields": "[]",
+        "fieldFormatMap": "{}"
+      }
+    },
+    {
+      "id": "k8s-sha-staging-*",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "k8s-sha-staging-*",
+        "timeFieldName": "@timestamp",
+        "fields": "[]",
+        "fieldFormatMap": "{}"
+      }
+    },
+    {
+      "id": "k8s-sha-production-*",
+      "type": "index-pattern",
+      "attributes": {
+        "title": "k8s-sha-production-*",
+        "timeFieldName": "@timestamp",
+        "fields": "[]",
+        "fieldFormatMap": "{}"
+      }
+    }
+  ]
+}

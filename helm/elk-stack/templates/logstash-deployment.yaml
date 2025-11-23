@@ -1,0 +1,72 @@
+{{- if .Values.logstash.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: logstash
+    component: logstash
+spec:
+  replicas: {{ .Values.logstash.replicas }}
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+        component: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: "{{ .Values.logstash.image.repository }}:{{ .Values.logstash.image.tag }}"
+        imagePullPolicy: {{ .Values.logstash.image.pullPolicy }}
+        env:
+        - name: LS_JAVA_OPTS
+          value: "-Xms{{ .Values.logstash.heapSize }} -Xmx{{ .Values.logstash.heapSize }}"
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        ports:
+        - name: beats
+          containerPort: 5044
+          protocol: TCP
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: monitoring
+          containerPort: 9600
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9600
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.logstash.resources | nindent 10 }}
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/logstash/config/logstash.yml
+          subPath: logstash.yml
+        - name: config
+          mountPath: /usr/share/logstash/config/pipelines.yml
+          subPath: pipelines.yml
+        - name: config
+          mountPath: /usr/share/logstash/pipeline/logstash.conf
+          subPath: logstash.conf
+      volumes:
+      - name: config
+        configMap:
+          name: logstash-config
+{{- end }}

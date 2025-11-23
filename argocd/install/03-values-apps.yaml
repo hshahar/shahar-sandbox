@@ -1,0 +1,36 @@
+# ArgoCD Apps Helm Values
+# This installs an AppProject and a root Application that syncs child apps
+# from your Git repo (path "argocd/applications" on branch main).
+
+projects:
+  - name: sha-blog-platform
+    namespace: argocd
+    spec:
+      description: "SHA Kubernetes Blog Platform - All environments"
+      sourceRepos:
+        - https://github.com/hshahar/Sumit-shaharH-test.git
+        - https://github.com/hshahar/*
+      destinations:
+        - namespace: '*'
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: '*'
+          kind: '*'
+
+applications:
+  - name: sha-blog-root-apps
+    namespace: argocd
+    project: sha-blog-platform
+    source:
+      repoURL: https://github.com/hshahar/Sumit-shaharH-test.git
+      targetRevision: main
+      path: argocd/applications
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: argocd
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - CreateNamespace=true

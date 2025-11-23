@@ -1,0 +1,31 @@
+{{- if and .Values.kibana.enabled .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kibana
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: kibana
+    component: kibana
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+  - host: {{ .Values.ingress.kibana.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: {{ .Values.kibana.service.port }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    - {{ .Values.ingress.kibana.host }}
+    secretName: kibana-tls
+  {{- end }}
+{{- end }}

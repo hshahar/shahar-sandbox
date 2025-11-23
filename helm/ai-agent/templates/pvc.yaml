@@ -1,0 +1,19 @@
+{{- if .Values.vectorDb.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "ai-agent.fullname" . }}-vector-db
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ai-agent
+    component: vector-db
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.vectorDb.persistence.storageClass }}
+  storageClassName: {{ .Values.vectorDb.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.vectorDb.persistence.size }}
+{{- end }}

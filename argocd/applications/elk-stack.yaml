@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: elk-stack
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: elk-stack
+    app.kubernetes.io/part-of: sha-blog-platform
+    component: logging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: sha-blog-platform
+
+  source:
+    repoURL: https://github.com/hshahar/Sumit-shaharH-test.git
+    targetRevision: HEAD
+    path: helm/elk-stack
+    helm:
+      releaseName: elk-stack
+      values: |
+        namespace: logging
+
+        elasticsearch:
+          enabled: true
+          replicas: 1
+          persistence:
+            enabled: true
+            size: 10Gi
+
+        logstash:
+          enabled: true
+          replicas: 1
+
+        kibana:
+          enabled: true
+          replicas: 1
+
+        filebeat:
+          enabled: true
+
+        ingress:
+          enabled: true
+          className: nginx
+          kibana:
+            host: sha-kibana.blog.local
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Health assessment
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates

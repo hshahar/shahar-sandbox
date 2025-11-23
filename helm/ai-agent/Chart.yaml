@@ -1,0 +1,14 @@
+apiVersion: v2
+name: ai-agent
+description: AI RAG Agent for Blog Post Quality Scoring
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - machine-learning
+  - rag
+  - scoring
+  - llm
+maintainers:
+  - name: SHA Blog Platform Team

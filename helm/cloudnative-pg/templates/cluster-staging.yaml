@@ -1,0 +1,79 @@
+{{- if .Values.clusters.staging.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.clusters.staging.name }}
+  namespace: {{ .Values.clusters.staging.namespace }}
+  labels:
+    app: postgresql
+    environment: staging
+    managed-by: cloudnative-pg
+spec:
+  instances: {{ .Values.clusters.staging.instances }}
+  imageName: {{ .Values.postgresql.image }}
+
+  postgresql:
+    parameters:
+      {{- toYaml .Values.postgresql.parameters | nindent 6 }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.clusters.staging.database.name }}
+      owner: {{ .Values.clusters.staging.database.owner }}
+      secret:
+        name: {{ .Values.clusters.staging.name }}-app-user
+
+  storage:
+    size: {{ .Values.clusters.staging.storage.size }}
+    {{- if .Values.clusters.staging.storage.storageClass }}
+    storageClass: {{ .Values.clusters.staging.storage.storageClass }}
+    {{- end }}
+
+  resources:
+    {{- toYaml .Values.clusters.staging.resources | nindent 4 }}
+
+  {{- if .Values.clusters.staging.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      destinationPath: "/var/lib/postgresql/backup"
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: {{ .Values.clusters.staging.backup.retentionPolicy }}
+    {{- if .Values.clusters.staging.backup.volumeSnapshot.enabled }}
+    volumeSnapshot:
+      className: csi-hostpath-snapclass
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.clusters.staging.monitoring.enabled }}
+  monitoring:
+    enablePodMonitor: {{ .Values.clusters.staging.monitoring.podMonitor }}
+  {{- end }}
+
+---
+{{- if .Values.clusters.staging.backup.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Values.clusters.staging.name }}-backup
+  namespace: {{ .Values.clusters.staging.namespace }}
+spec:
+  schedule: {{ .Values.clusters.staging.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.clusters.staging.name }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.clusters.staging.name }}-app-user
+  namespace: {{ .Values.clusters.staging.namespace }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: {{ .Values.clusters.staging.database.owner }}
+  password: "staging-secure-pass-456"
+{{- end }}

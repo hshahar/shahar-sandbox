@@ -111,6 +111,10 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/rate-limit: "1000"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    # Connection draining for graceful shutdown
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
   tls:
     enabled: false  # Set to true in real production with valid cert
 

@@ -1,0 +1,118 @@
+{{- if .Values.clusters.production.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.clusters.production.name }}
+  namespace: {{ .Values.clusters.production.namespace }}
+  labels:
+    app: postgresql
+    environment: production
+    managed-by: cloudnative-pg
+spec:
+  instances: {{ .Values.clusters.production.instances }}
+  imageName: {{ .Values.postgresql.image }}
+
+  postgresql:
+    parameters:
+      {{- toYaml .Values.postgresql.parameters | nindent 6 }}
+
+  bootstrap:
+    initdb:
+      database: {{ .Values.clusters.production.database.name }}
+      owner: {{ .Values.clusters.production.database.owner }}
+      secret:
+        name: {{ .Values.clusters.production.name }}-app-user
+
+  storage:
+    size: {{ .Values.clusters.production.storage.size }}
+    {{- if .Values.clusters.production.storage.storageClass }}
+    storageClass: {{ .Values.clusters.production.storage.storageClass }}
+    {{- end }}
+
+  resources:
+    {{- toYaml .Values.clusters.production.resources | nindent 4 }}
+
+  {{- if .Values.clusters.production.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      {{- if .Values.clusters.production.backup.s3.enabled }}
+      destinationPath: s3://{{ .Values.clusters.production.backup.s3.bucket }}{{ .Values.clusters.production.backup.s3.path }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ .Values.clusters.production.name }}-s3-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: {{ .Values.clusters.production.name }}-s3-creds
+          key: ACCESS_SECRET_KEY
+        region:
+          name: {{ .Values.clusters.production.name }}-s3-creds
+          key: REGION
+      {{- else }}
+      destinationPath: "/var/lib/postgresql/backup"
+      {{- end }}
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: {{ .Values.clusters.production.backup.retentionPolicy }}
+    {{- if .Values.clusters.production.backup.volumeSnapshot.enabled }}
+    volumeSnapshot:
+      className: csi-hostpath-snapclass
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.clusters.production.monitoring.enabled }}
+  monitoring:
+    enablePodMonitor: {{ .Values.clusters.production.monitoring.podMonitor }}
+  {{- end }}
+
+  # High Availability
+  {{- if .Values.clusters.production.highAvailability.enabled }}
+  primaryUpdateStrategy: unsupervised
+  minSyncReplicas: 1
+  maxSyncReplicas: 2
+  {{- end }}
+
+---
+{{- if .Values.clusters.production.pooler.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ .Values.clusters.production.name }}-pooler-{{ .Values.clusters.production.pooler.type }}
+  namespace: {{ .Values.clusters.production.namespace }}
+spec:
+  cluster:
+    name: {{ .Values.clusters.production.name }}
+  instances: {{ .Values.clusters.production.pooler.instances }}
+  type: {{ .Values.clusters.production.pooler.type }}
+  pgbouncer:
+    poolMode: {{ .Values.clusters.production.pooler.poolMode }}
+    parameters:
+      {{- toYaml .Values.clusters.production.pooler.parameters | nindent 6 }}
+{{- end }}
+
+---
+{{- if .Values.clusters.production.backup.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Values.clusters.production.name }}-backup
+  namespace: {{ .Values.clusters.production.namespace }}
+spec:
+  schedule: {{ .Values.clusters.production.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.clusters.production.name }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.clusters.production.name }}-app-user
+  namespace: {{ .Values.clusters.production.namespace }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: {{ .Values.clusters.production.database.owner }}
+  password: "CHANGE-ME-IN-PRODUCTION-USE-VAULT"
+{{- end }}

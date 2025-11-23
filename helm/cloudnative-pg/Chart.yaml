@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cloudnative-pg
+description: CloudNativePG Operator and PostgreSQL Clusters for SHA Blog Platform
+type: application
+version: 1.0.0
+appVersion: "1.22.0"
+keywords:
+  - postgresql
+  - database
+  - operator
+  - cloudnative-pg
+  - cnpg
+maintainers:
+  - name: SHA Blog Platform Team

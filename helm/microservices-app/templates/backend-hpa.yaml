@@ -31,11 +31,15 @@ spec:
   {{- end }}
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300
+      stabilizationWindowSeconds: {{ .Values.backend.autoscaling.scaleDown.stabilizationWindowSeconds | default 600 }}
+      selectPolicy: Min
       policies:
       - type: Percent
-        value: 50
-        periodSeconds: 60
+        value: {{ .Values.backend.autoscaling.scaleDown.percentValue | default 50 }}
+        periodSeconds: {{ .Values.backend.autoscaling.scaleDown.periodSeconds | default 60 }}
+      - type: Pods
+        value: {{ .Values.backend.autoscaling.scaleDown.podsValue | default 1 }}
+        periodSeconds: {{ .Values.backend.autoscaling.scaleDown.periodSeconds | default 60 }}
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:

@@ -1,0 +1,76 @@
+{{- if .Values.aiAgent.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-ai-agent
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ai-agent
+    {{- include "microservices-app.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.aiAgent.replicas }}
+  selector:
+    matchLabels:
+      app: ai-agent
+  template:
+    metadata:
+      labels:
+        app: ai-agent
+        {{- include "microservices-app.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: ai-agent
+        image: "{{ .Values.aiAgent.image.repository }}:{{ .Values.aiAgent.image.tag }}"
+        imagePullPolicy: {{ .Values.aiAgent.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://{{ .Values.secrets.database.username }}:{{ .Values.secrets.database.password }}@{{ include "microservices-app.fullname" . }}-postgres:5432/{{ .Values.postgresql.database }}"
+        - name: MODEL_PROVIDER
+          value: {{ .Values.aiAgent.modelProvider | quote }}
+        - name: OLLAMA_BASE_URL
+          value: {{ .Values.aiAgent.ollama.baseUrl | quote }}
+        - name: OLLAMA_MODEL
+          value: {{ .Values.aiAgent.ollama.model | quote }}
+        {{- if eq .Values.aiAgent.modelProvider "openai" }}
+        - name: OPENAI_API_KEY
+          value: {{ .Values.aiAgent.openai.apiKey | quote }}
+        - name: OPENAI_MODEL
+          value: {{ .Values.aiAgent.openai.model | quote }}
+        {{- end }}
+        - name: VECTOR_DB_PATH
+          value: "/data/chroma_db"
+
+        {{- if .Values.aiAgent.persistence.enabled }}
+        volumeMounts:
+        - name: vector-data
+          mountPath: /data
+        {{- end }}
+
+        resources:
+          {{- toYaml .Values.aiAgent.resources | nindent 10 }}
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+      {{- if .Values.aiAgent.persistence.enabled }}
+      volumes:
+      - name: vector-data
+        persistentVolumeClaim:
+          claimName: {{ include "microservices-app.fullname" . }}-ai-agent-pvc
+      {{- end }}
+{{- end }}

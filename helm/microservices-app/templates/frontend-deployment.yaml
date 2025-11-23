@@ -26,6 +26,7 @@ spec:
       {{- if .Values.security.userNamespaces.enabled }}
       hostUsers: false
       {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.frontend.terminationGracePeriodSeconds | default 30 }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 101  # nginx user
@@ -53,6 +54,17 @@ spec:
           value: "http://{{ include "microservices-app.fullname" . }}-backend:{{ .Values.backend.service.port }}"
         - name: ENVIRONMENT
           value: {{ .Values.environment }}
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - |
+                # Sleep to allow load balancer to remove pod from endpoints
+                sleep {{ .Values.frontend.preStopSleepSeconds | default 5 }}
+                # Gracefully stop nginx
+                /usr/sbin/nginx -s quit
         livenessProbe:
           httpGet:
             path: /

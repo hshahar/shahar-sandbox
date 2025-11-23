@@ -1,0 +1,19 @@
+{{- if and .Values.aiAgent.enabled .Values.aiAgent.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-ai-agent-pvc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ai-agent
+    {{- include "microservices-app.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  {{- if .Values.aiAgent.persistence.storageClass }}
+  storageClassName: {{ .Values.aiAgent.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.aiAgent.persistence.size }}
+{{- end }}

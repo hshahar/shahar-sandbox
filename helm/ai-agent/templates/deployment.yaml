@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ai-agent.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ai-agent
+    component: ai-scoring
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: ai-agent
+  template:
+    metadata:
+      labels:
+        app: ai-agent
+        component: ai-scoring
+    spec:
+      containers:
+      - name: ai-agent
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: {{ .Values.database.url | quote }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              {{- if .Values.openai.existingSecret }}
+              name: {{ .Values.openai.existingSecret }}
+              key: {{ .Values.openai.existingSecretKey }}
+              {{- else }}
+              name: {{ include "ai-agent.fullname" . }}-secrets
+              key: openai-api-key
+              {{- end }}
+        - name: VECTOR_DB_PATH
+          value: "/app/chroma_db"
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        {{- if .Values.vectorDb.persistence.enabled }}
+        - name: vector-db
+          mountPath: /app/chroma_db
+        {{- end }}
+      volumes:
+      {{- if .Values.vectorDb.persistence.enabled }}
+      - name: vector-db
+        persistentVolumeClaim:
+          claimName: {{ include "ai-agent.fullname" . }}-vector-db
+      {{- end }}

@@ -1,0 +1,55 @@
+# Ollama Configuration
+replicaCount: 1
+
+image:
+  repository: ollama/ollama
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 11434
+
+# Resource limits
+resources:
+  requests:
+    memory: "2Gi"
+    cpu: "1000m"
+  limits:
+    memory: "8Gi"
+    cpu: "4000m"
+
+# GPU support (optional - enable if you have GPU nodes)
+gpu:
+  enabled: false
+  # If enabled, requires nvidia-device-plugin in cluster
+  nvidia:
+    com/gpu: 1
+
+# Persistence for models
+persistence:
+  enabled: true
+  storageClass: ""  # Use default storage class
+  accessMode: ReadWriteOnce
+  size: 20Gi  # Models can be large (Llama3 ~4.7GB, Mistral ~4.1GB)
+
+# Models to pre-pull on startup
+# Available models: llama3, llama2, mistral, gemma, codellama, phi, vicuna
+models:
+  - llama3        # 4.7GB - Best general purpose
+  - mistral       # 4.1GB - Fast and good quality
+  # - gemma       # 5.2GB - Google's model
+  # - codellama   # 3.8GB - Best for code
+
+# Environment variables
+env: []
+
+# Node selector (for GPU nodes if needed)
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

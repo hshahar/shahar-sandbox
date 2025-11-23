@@ -1,0 +1,160 @@
+# Default values for CloudNativePG
+
+# Operator configuration
+operator:
+  enabled: true
+  namespace: cnpg-system
+
+  # Use official CloudNativePG operator chart
+  helmChart:
+    repo: https://cloudnative-pg.github.io/charts
+    name: cloudnative-pg
+    version: "0.20.0"
+
+# PostgreSQL Cluster configurations per environment
+clusters:
+  # Development cluster
+  dev:
+    enabled: true
+    namespace: sha-dev
+    name: sha-blog-dev-pg
+    instances: 1
+
+    database:
+      name: sha_blog_dev
+      owner: app_user
+
+    storage:
+      size: 5Gi
+      storageClass: ""  # Use default
+
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"  # Daily at 2 AM
+      retentionPolicy: "7d"
+      volumeSnapshot:
+        enabled: false
+      s3:
+        enabled: false
+
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 250m
+        memory: 512Mi
+
+    monitoring:
+      enabled: true
+      podMonitor: true
+
+  # Staging cluster
+  staging:
+    enabled: false
+    namespace: sha-staging
+    name: sha-blog-staging-pg
+    instances: 2  # Primary + 1 replica
+
+    database:
+      name: sha_blog_staging
+      owner: app_user
+
+    storage:
+      size: 10Gi
+      storageClass: ""
+
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"
+      retentionPolicy: "14d"
+      volumeSnapshot:
+        enabled: true
+      s3:
+        enabled: false
+
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+    monitoring:
+      enabled: true
+      podMonitor: true
+
+  # Production cluster
+  production:
+    enabled: false
+    namespace: sha-production
+    name: sha-blog-prod-pg
+    instances: 3  # Primary + 2 replicas (HA)
+
+    database:
+      name: sha_blog_production
+      owner: app_user
+
+    storage:
+      size: 50Gi
+      storageClass: ""
+
+    backup:
+      enabled: true
+      schedule: "0 2 * * *"
+      retentionPolicy: "30d"
+      volumeSnapshot:
+        enabled: true
+      s3:
+        enabled: true
+        # Configure these values for production
+        bucket: "sha-blog-pg-backups"
+        region: "us-east-1"
+        path: "/production"
+
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
+    # High Availability configuration
+    highAvailability:
+      enabled: true
+
+    monitoring:
+      enabled: true
+      podMonitor: true
+
+    # Connection pooling with PgBouncer
+    pooler:
+      enabled: true
+      instances: 2
+      type: rw  # read-write pool
+      poolMode: transaction
+      parameters:
+        max_client_conn: "1000"
+        default_pool_size: "25"
+
+# PostgreSQL configuration
+postgresql:
+  version: "15"
+  image: "ghcr.io/cloudnative-pg/postgresql:15.5"
+
+  # Shared configuration for all clusters
+  parameters:
+    shared_buffers: "256MB"
+    effective_cache_size: "1GB"
+    maintenance_work_mem: "64MB"
+    checkpoint_completion_target: "0.9"
+    wal_buffers: "16MB"
+    default_statistics_target: "100"
+    random_page_cost: "1.1"
+    effective_io_concurrency: "200"
+    work_mem: "4MB"
+    min_wal_size: "1GB"
+    max_wal_size: "4GB"
+    max_connections: "100"

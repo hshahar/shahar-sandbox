@@ -11,6 +11,8 @@ interface BlogPost {
   tags: string | null
   created_at: string
   updated_at: string
+  ai_score?: number | null
+  last_scored_at?: string | null
 }
 
 interface BlogPostForm {
@@ -154,6 +156,37 @@ function App() {
     return (
       <div className="container">
         <div className="error">{error}</div>
+      </div>
+    )
+  }
+
+  // Helper function to get AI score badge
+  const getScoreBadge = (score: number | null | undefined) => {
+    if (!score) return null
+
+    let badgeClass = 'score-badge '
+    let emoji = ''
+
+    if (score >= 90) {
+      badgeClass += 'score-excellent'
+      emoji = '⭐'
+    } else if (score >= 80) {
+      badgeClass += 'score-good'
+      emoji = '✨'
+    } else if (score >= 70) {
+      badgeClass += 'score-average'
+      emoji = '👍'
+    } else if (score >= 60) {
+      badgeClass += 'score-fair'
+      emoji = '📝'
+    } else {
+      badgeClass += 'score-poor'
+      emoji = '💡'
+    }
+
+    return (
+      <div className={badgeClass} title="AI Quality Score">
+        {emoji} {score}/100
       </div>
     )
   }
@@ -303,11 +336,18 @@ function App() {
             posts.map((post) => (
               <article key={post.id} className="post-card" onClick={() => setSelectedPost(post)}>
                 <div className="post-category">{post.category}</div>
+                {getScoreBadge(post.ai_score)}
                 <h2 className="post-title">{post.title}</h2>
                 <div className="post-meta">
                   <span>By {post.author}</span>
                   <span>•</span>
                   <span>{new Date(post.created_at).toLocaleDateString()}</span>
+                  {post.ai_score === null && post.last_scored_at === null && (
+                    <>
+                      <span>•</span>
+                      <span className="scoring-status">🤖 Scoring...</span>
+                    </>
+                  )}
                 </div>
                 <p className="post-excerpt">
                   {post.content.substring(0, 150)}...

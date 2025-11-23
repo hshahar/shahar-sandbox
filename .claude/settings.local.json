@@ -27,7 +27,8 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: SHA Kubernetes Blog Platform with full CRUD functionality\n\nThis commit includes the complete production-ready Kubernetes blog platform with:\n\n## Frontend\n- React application with full CRUD UI (Create, Read, Update, Delete)\n- Modal forms for creating and editing blog posts\n- Post detail view with click-to-expand\n- Responsive grid layout with modern styling\n- 8 blog categories: Kubernetes, Security, CI/CD, Helm, Networking, Storage, Monitoring, GitOps\n\n## Backend\n- FastAPI REST API with PostgreSQL database\n- Prometheus metrics integration\n- Rate limiting for API protection\n- Enhanced health checks for Kubernetes probes\n- Comprehensive test suite (70+ tests with pytest)\n\n## Infrastructure\n- Helm charts for multi-environment deployment (dev/staging/prod)\n- ArgoCD GitOps integration with App-of-Apps pattern\n- Automated PostgreSQL backups with 7-day retention\n- Resource quotas and limit ranges for cluster protection\n- HashiCorp Vault integration for secrets management\n- Kyverno policy enforcement\n- KEDA event-driven autoscaling\n\n## Security\n- Network policies with Calico CNI\n- Pod Security Admission (PSA)\n- Container security with read-only root filesystem\n- Supply chain security (Cosign, SBOM)\n\n## Monitoring\n- Prometheus metrics collection\n- Grafana dashboards\n- ServiceMonitor configurations\n\n## CI/CD\n- GitHub Actions golden pipeline\n- Trivy vulnerability scanning\n- Cosign image signing\n- Automated Helm values updates\n\n## Documentation\n- 28 comprehensive documentation files\n- Master documentation index\n- Quick start guides\n- Architecture diagrams\n- Troubleshooting guides\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git remote add:*)",
       "Bash(git branch:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

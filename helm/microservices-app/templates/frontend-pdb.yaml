@@ -1,0 +1,20 @@
+{{- if and .Values.frontend.enabled .Values.frontend.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-frontend-pdb
+  labels:
+    {{- include "microservices-app.frontend.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.frontend.pdb.minAvailable }}
+  minAvailable: {{ .Values.frontend.pdb.minAvailable }}
+  {{- else if .Values.frontend.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.frontend.pdb.maxUnavailable }}
+  {{- else }}
+  minAvailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      app: frontend
+      {{- include "microservices-app.selectorLabels" . | nindent 6 }}
+{{- end }}

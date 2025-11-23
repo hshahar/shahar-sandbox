@@ -1,0 +1,106 @@
+{{- if .Values.clusters.dev.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.clusters.dev.name }}
+  namespace: {{ .Values.clusters.dev.namespace }}
+  labels:
+    app: postgresql
+    environment: dev
+    managed-by: cloudnative-pg
+spec:
+  instances: {{ .Values.clusters.dev.instances }}
+
+  # PostgreSQL configuration
+  imageName: {{ .Values.postgresql.image }}
+  postgresql:
+    parameters:
+      {{- toYaml .Values.postgresql.parameters | nindent 6 }}
+
+  # Bootstrap
+  bootstrap:
+    initdb:
+      database: {{ .Values.clusters.dev.database.name }}
+      owner: {{ .Values.clusters.dev.database.owner }}
+      secret:
+        name: {{ .Values.clusters.dev.name }}-app-user
+
+  # Storage
+  storage:
+    size: {{ .Values.clusters.dev.storage.size }}
+    {{- if .Values.clusters.dev.storage.storageClass }}
+    storageClass: {{ .Values.clusters.dev.storage.storageClass }}
+    {{- end }}
+
+  # Resources
+  resources:
+    {{- toYaml .Values.clusters.dev.resources | nindent 4 }}
+
+  # Backup configuration
+  {{- if .Values.clusters.dev.backup.enabled }}
+  backup:
+    barmanObjectStore:
+      destinationPath: "/var/lib/postgresql/backup"
+      {{- if .Values.clusters.dev.backup.s3.enabled }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ .Values.clusters.dev.name }}-s3-creds
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: {{ .Values.clusters.dev.name }}-s3-creds
+          key: ACCESS_SECRET_KEY
+      {{- end }}
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+    retentionPolicy: {{ .Values.clusters.dev.backup.retentionPolicy }}
+  {{- end }}
+
+  # Monitoring
+  {{- if .Values.clusters.dev.monitoring.enabled }}
+  monitoring:
+    enablePodMonitor: {{ .Values.clusters.dev.monitoring.podMonitor }}
+  {{- end }}
+
+  # Affinity and tolerations
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: cnpg.io/cluster
+              operator: In
+              values:
+              - {{ .Values.clusters.dev.name }}
+          topologyKey: kubernetes.io/hostname
+
+---
+# Scheduled Backup
+{{- if .Values.clusters.dev.backup.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Values.clusters.dev.name }}-backup
+  namespace: {{ .Values.clusters.dev.namespace }}
+spec:
+  schedule: {{ .Values.clusters.dev.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.clusters.dev.name }}
+{{- end }}
+
+---
+# Application user secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.clusters.dev.name }}-app-user
+  namespace: {{ .Values.clusters.dev.namespace }}
+type: kubernetes.io/basic-auth
+stringData:
+  username: {{ .Values.clusters.dev.database.owner }}
+  password: "devpass123"  # Change in production!
+{{- end }}

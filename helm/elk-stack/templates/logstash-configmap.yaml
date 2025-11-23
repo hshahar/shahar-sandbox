@@ -1,0 +1,116 @@
+{{- if .Values.logstash.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: logstash
+    component: logstash
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+
+  pipelines.yml: |
+    - pipeline.id: main
+      path.config: "/usr/share/logstash/pipeline/logstash.conf"
+
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+        host => "0.0.0.0"
+      }
+      http {
+        port => 8080
+        codec => json
+      }
+    }
+
+    filter {
+      # Parse JSON logs
+      if [message] =~ /^\{.*\}$/ {
+        json {
+          source => "message"
+          target => "log_data"
+        }
+      }
+
+      # Add Kubernetes metadata
+      if [kubernetes] {
+        mutate {
+          add_field => {
+            "k8s_namespace" => "%{[kubernetes][namespace]}"
+            "k8s_pod" => "%{[kubernetes][pod][name]}"
+            "k8s_container" => "%{[kubernetes][container][name]}"
+            "k8s_node" => "%{[kubernetes][node][name]}"
+          }
+        }
+      }
+
+      # Parse FastAPI logs
+      if [k8s_container] == "backend" {
+        grok {
+          match => {
+            "message" => [
+              "%{TIMESTAMP_ISO8601:timestamp} - %{LOGLEVEL:log_level} - %{GREEDYDATA:log_message}",
+              "%{GREEDYDATA:log_message}"
+            ]
+          }
+        }
+
+        # Extract request information from uvicorn logs
+        grok {
+          match => {
+            "message" => '%{IPORHOST:client_ip} - - \[%{HTTPDATE:request_time}\] "%{WORD:http_method} %{URIPATHPARAM:request_path} HTTP/%{NUMBER:http_version}" %{NUMBER:status_code} -'
+          }
+          tag_on_failure => []
+        }
+      }
+
+      # Parse nginx access logs
+      if [k8s_container] == "frontend" {
+        grok {
+          match => {
+            "message" => '%{IPORHOST:client_ip} - - \[%{HTTPDATE:request_time}\] "%{WORD:http_method} %{URIPATHPARAM:request_path} HTTP/%{NUMBER:http_version}" %{NUMBER:status_code} %{NUMBER:bytes_sent} "%{DATA:referrer}" "%{DATA:user_agent}"'
+          }
+        }
+      }
+
+      # Convert status_code to integer
+      if [status_code] {
+        mutate {
+          convert => { "status_code" => "integer" }
+        }
+      }
+
+      # Add timestamp
+      date {
+        match => [ "timestamp", "ISO8601", "dd/MMM/yyyy:HH:mm:ss Z" ]
+        target => "@timestamp"
+      }
+
+      # Remove unnecessary fields
+      mutate {
+        remove_field => [ "agent", "ecs", "host" ]
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => ["http://elasticsearch:9200"]
+        index => "k8s-logs-%{+YYYY.MM.dd}"
+
+        # Create separate indices per namespace
+        if [k8s_namespace] {
+          index => "k8s-%{k8s_namespace}-%{+YYYY.MM.dd}"
+        }
+      }
+
+      # Debug output (remove in production)
+      stdout {
+        codec => rubydebug
+      }
+    }
+{{- end }}
