@@ -27,6 +27,14 @@ spec:
   - matches:
     - path:
         type: PathPrefix
+        value: /vault
+    backendRefs:
+    - name: vault
+      namespace: vault
+      port: 8200
+  - matches:
+    - path:
+        type: PathPrefix
         value: /
     backendRefs:
     - name: {{ include "microservices-app.fullname" . }}-frontend

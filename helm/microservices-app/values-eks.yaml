@@ -8,9 +8,11 @@ autoscaling:
   enabled: true
   type: keda  # Use KEDA for event-driven autoscaling
 
-# Vault integration - Disabled in dev (use basic secrets)
+# Vault integration - Enabled
 vault:
-  enabled: false
+  enabled: true
+  address: "http://vault.vault.svc:8200"
+  role: "sha-dev"
   refreshInterval: "5m"
 
 # Argo Rollouts - Disabled in dev (use regular Deployments)
@@ -32,7 +34,7 @@ frontend:
   replicas: 1
   image:
     repository: 179580348028.dkr.ecr.us-west-2.amazonaws.com/sha-blog-frontend
-    tag: "v1.1"
+    tag: "v1.2"
     pullPolicy: IfNotPresent
   service:
     port: 8080  # Use port 8080 to avoid root permission issues

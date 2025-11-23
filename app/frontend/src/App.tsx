@@ -398,6 +398,9 @@ function App() {
               <a href="/ai" target="_blank" rel="noopener noreferrer" className="service-link">
                 🤖 AI Agent
               </a>
+              <a href="/vault/ui" target="_blank" rel="noopener noreferrer" className="service-link">
+                🔐 Vault
+              </a>
             </div>
           </div>
         </div>
