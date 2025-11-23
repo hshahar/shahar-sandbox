@@ -1,0 +1,130 @@
+# EKS Environment Values - AWS ALB Ingress
+
+environment: dev
+namespace: sha-dev
+
+# Vault integration - Disabled in dev (use basic secrets)
+vault:
+  enabled: false
+  refreshInterval: "5m"
+
+# Argo Rollouts - Disabled in dev (use regular Deployments)
+argoRollouts:
+  enabled: false
+
+# Monitoring - Enabled (Prometheus is installed)
+monitoring:
+  enabled: true
+  alerts:
+    errorRate:
+      threshold: 10  # More lenient in dev
+    latencyP95:
+      threshold: 2000
+
+# Frontend configuration
+frontend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: nginx
+    tag: "1.25-alpine"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080  # Use port 8080 to avoid root permission issues
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Backend configuration
+backend:
+  enabled: true
+  replicas: 1
+  image:
+    repository: python
+    tag: "3.11-slim"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+
+# PostgreSQL configuration - Use EBS storage class
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+  database: sha_blog_dev
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  persistence:
+    size: 1Gi
+    storageClass: "ebs-gp3"  # Use EBS storage class for EKS
+
+# AI Agent configuration
+aiAgent:
+  enabled: true
+  image:
+    repository: python
+    tag: "3.11-slim"
+    pullPolicy: IfNotPresent
+  persistence:
+    storageClass: "ebs-gp3"  # Use EBS storage class for EKS
+
+# Ingress configuration - AWS ALB for EKS
+ingress:
+  enabled: true
+  className: alb  # Use ALB instead of nginx
+  host: ""  # Leave empty, we'll use ALB DNS
+  annotations:
+    # AWS Load Balancer Controller annotations
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # Connection draining for graceful shutdown
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+  tls:
+    enabled: false
+
+# Secrets - Use weak passwords in dev
+secrets:
+  database:
+    username: "devuser"
+    password: "devpass123"
+  backend:
+    apiKey: "dev-api-key-12345"
+
+# Security Configuration
+security:
+  userNamespaces:
+    enabled: false
+  kyverno:
+    enabled: false
+    validationFailureAction: audit
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  allowExternalEgress: true
+

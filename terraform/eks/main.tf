@@ -148,9 +148,6 @@ module "eks" {
     }
   }
 
-  # Cluster access entry
-  enable_cluster_creator_admin_permissions = true
-
   tags = {
     Name = var.cluster_name
   }

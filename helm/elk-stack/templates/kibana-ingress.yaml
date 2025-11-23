@@ -12,6 +12,7 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
+  {{- if .Values.ingress.kibana.host }}
   - host: {{ .Values.ingress.kibana.host }}
     http:
       paths:
@@ -22,6 +23,17 @@ spec:
             name: kibana
             port:
               number: {{ .Values.kibana.service.port }}
+  {{- else }}
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kibana
+            port:
+              number: {{ .Values.kibana.service.port }}
+  {{- end }}
   {{- if .Values.ingress.tls.enabled }}
   tls:
   - hosts:
