@@ -3,6 +3,11 @@
 environment: dev
 namespace: sha-dev
 
+# Autoscaling Configuration
+autoscaling:
+  enabled: true
+  type: keda  # Use KEDA for event-driven autoscaling
+
 # Vault integration - Disabled in dev (use basic secrets)
 vault:
   enabled: false
@@ -38,6 +43,32 @@ frontend:
     requests:
       cpu: 100m
       memory: 128Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    cpu:
+      enabled: true
+      targetUtilization: "70"
+    memory:
+      enabled: true
+      targetUtilization: "80"
+    pollingInterval: 30
+    cooldownPeriod: 300
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percentagePolicyValue: 50
+      percentagePolicyPeriod: 60
+      podsPolicyValue: 1
+      podsPolicyPeriod: 60
+      selectPolicy: "Min"
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      percentagePolicyValue: 100
+      percentagePolicyPeriod: 30
+      podsPolicyValue: 2
+      podsPolicyPeriod: 30
+      selectPolicy: "Max"
 
 # Backend configuration
 backend:
@@ -57,7 +88,31 @@ backend:
       cpu: 200m
       memory: 256Mi
   autoscaling:
-    enabled: false
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    cpu:
+      enabled: true
+      targetUtilization: "70"
+    memory:
+      enabled: true
+      targetUtilization: "80"
+    pollingInterval: 30
+    cooldownPeriod: 300
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percentagePolicyValue: 50
+      percentagePolicyPeriod: 60
+      podsPolicyValue: 1
+      podsPolicyPeriod: 60
+      selectPolicy: "Min"
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      percentagePolicyValue: 100
+      percentagePolicyPeriod: 30
+      podsPolicyValue: 2
+      podsPolicyPeriod: 30
+      selectPolicy: "Max"
 
 # PostgreSQL configuration - Use EBS storage class
 postgresql:
