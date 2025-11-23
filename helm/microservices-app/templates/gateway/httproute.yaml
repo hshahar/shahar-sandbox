@@ -21,6 +21,12 @@ spec:
     - path:
         type: PathPrefix
         value: /ai
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
     backendRefs:
     - name: ai-agent
       port: 8000
@@ -28,6 +34,12 @@ spec:
     - path:
         type: PathPrefix
         value: /vault
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /
     backendRefs:
     - name: vault
       namespace: vault
