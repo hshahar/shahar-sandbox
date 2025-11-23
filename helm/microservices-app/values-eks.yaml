@@ -34,7 +34,7 @@ frontend:
   replicas: 1
   image:
     repository: 179580348028.dkr.ecr.us-west-2.amazonaws.com/sha-blog-frontend
-    tag: "v1.2"
+    tag: "v1.6"
     pullPolicy: IfNotPresent
   service:
     port: 8080  # Use port 8080 to avoid root permission issues
@@ -173,7 +173,7 @@ aiAgent:
   modelProvider: "ollama"  # Use Ollama instead of OpenAI
   ollama:
     baseUrl: "http://ollama:11434"
-    model: "llama3"
+    model: "mistral:7b-instruct-q4_0"
   openai:
     apiKey: ""
     model: "gpt-4-turbo-preview"

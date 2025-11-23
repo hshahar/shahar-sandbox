@@ -389,6 +389,9 @@ function App() {
           <div className="service-links">
             <h3>📊 Platform Services</h3>
             <div className="links-grid">
+              <a href="/credentials.html" target="_blank" rel="noopener noreferrer" className="service-link credentials-link">
+                🔐 Credentials & Access
+              </a>
               <a href="http://k8s-logging-kibana-f737ecb493-640190764.us-west-2.elb.amazonaws.com" target="_blank" rel="noopener noreferrer" className="service-link">
                 🔍 Kibana
               </a>
