@@ -27,6 +27,8 @@ spec:
         path:
           type: ReplacePrefixMatch
           replacePrefixMatch: /
+    timeouts:
+      request: 300s  # 5 minutes for LLM inference
     backendRefs:
     - name: ai-agent
       port: 8000
