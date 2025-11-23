@@ -14,10 +14,10 @@ service:
 # Resource limits - reduced for dev cluster
 resources:
   requests:
-    memory: "4Gi"
+    memory: "5Gi"
     cpu: "500m"
   limits:
-    memory: "6Gi"
+    memory: "7Gi"
     cpu: "2000m"
 
 # GPU support (optional - enable if you have GPU nodes)
