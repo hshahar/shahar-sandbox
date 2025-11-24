@@ -30,7 +30,11 @@
       "Bash(git push:*)",
       "Bash(mkdir:*)",
       "Bash(git commit:*)",
-      "Bash(kubectl config:*)"
+      "Bash(kubectl config:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell -File:*)",
+      "Bash(where.exe:*)",
+      "Bash(aws eks update-kubeconfig:*)"
     ],
     "deny": [],
     "ask": []

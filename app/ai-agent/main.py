@@ -196,6 +196,8 @@ async def analyze_with_llm(post: Dict) -> Dict:
                 json_str = response_text[first_brace:last_brace + 1]
                 # Clean up common escape issues
                 json_str = json_str.replace('\n', ' ').replace('\r', ' ')
+                # Remove escaped underscores (technical\_accuracy -> technical_accuracy)
+                json_str = json_str.replace('\\_', '_')
                 # Remove invalid escape sequences
                 json_str = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', json_str)
                 

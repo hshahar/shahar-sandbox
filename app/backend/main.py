@@ -262,7 +262,7 @@ async def trigger_ai_scoring(post_id: int):
         return
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:  # Increased timeout for Ollama LLM
             response = await client.post(
                 f"{AI_AGENT_URL}/score",
                 json={"post_id": post_id}

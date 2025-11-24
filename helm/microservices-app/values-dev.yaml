@@ -56,6 +56,10 @@ backend:
       memory: 256Mi
   autoscaling:
     enabled: false
+  # AI Agent integration
+  aiAgent:
+    enabled: true
+    url: "http://ai-agent:8000"
 
 # PostgreSQL configuration - Optional in dev
 postgresql:
@@ -109,3 +113,36 @@ security:
 networkPolicy:
   enabled: true
   allowExternalEgress: true
+
+# AI Agent configuration
+aiAgent:
+  enabled: true
+  replicas: 1
+  modelProvider: "openai"  # or "ollama" for free local model
+  image:
+    repository: sha-ai-agent
+    tag: "dev"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  # OpenAI configuration (comment out if using Ollama)
+  openai:
+    apiKey: ""  # Set this via --set or create a secret
+    model: "gpt-4-turbo-preview"
+  # Ollama configuration (uncomment if using local model)
+  # ollama:
+  #   baseUrl: "http://ollama:11434"
+  #   model: "llama3"
+  persistence:
+    enabled: true
+    size: 5Gi
+  env:
+    DATABASE_URL: "postgresql://devuser:devpass123@postgresql:5432/sha_blog_dev"

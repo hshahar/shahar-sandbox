@@ -150,6 +150,16 @@ spec:
     - protocol: TCP
       port: 80
   {{- end }}
+  # Allow to AI Agent
+  {{- if .Values.aiAgent.enabled }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ai-agent
+    ports:
+    - protocol: TCP
+      port: {{ .Values.aiAgent.service.port }}
+  {{- end }}
 {{- end }}
 
 {{- if .Values.postgresql.enabled }}
@@ -189,5 +199,95 @@ spec:
     ports:
     - protocol: UDP
       port: 53
+  # Allow to AI Agent (for scoring)
+  {{- if .Values.aiAgent.enabled }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ai-agent
+    ports:
+    - protocol: TCP
+      port: {{ .Values.aiAgent.service.port }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.aiAgent.enabled }}
+---
+# AI Agent Network Policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "microservices-app.fullname" . }}-ai-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "microservices-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ai-agent
+spec:
+  podSelector:
+    matchLabels:
+      app: ai-agent
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from Backend
+  {{- if .Values.backend.enabled }}
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: {{ .Values.aiAgent.service.port }}
+  {{- end }}
+  # Allow from PostgreSQL (for AI agent to query posts)
+  {{- if .Values.postgresql.enabled }}
+  - from:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: {{ .Values.aiAgent.service.port }}
+  {{- end }}
+  egress:
+  # Allow DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow to PostgreSQL
+  {{- if .Values.postgresql.enabled }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  {{- end }}
+  # Allow external HTTPS for OpenAI/Ollama
+  {{- if .Values.networkPolicy.allowExternalEgress }}
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+  {{- end }}
+  # Allow to Ollama if using local model
+  {{- if eq .Values.aiAgent.modelProvider "ollama" }}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: ollama
+    ports:
+    - protocol: TCP
+      port: 11434
+  {{- end }}
 {{- end }}
 {{- end }}
