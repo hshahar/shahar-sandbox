@@ -34,7 +34,8 @@
       "Bash(findstr:*)",
       "Bash(powershell -File:*)",
       "Bash(where.exe:*)",
-      "Bash(aws eks update-kubeconfig:*)"
+      "Bash(aws eks update-kubeconfig:*)",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []
