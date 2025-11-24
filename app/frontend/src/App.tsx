@@ -162,7 +162,7 @@ function App() {
 
   // Helper function to get AI score badge
   const getScoreBadge = (score: number | null | undefined) => {
-    if (!score) return null
+    if (score === null || score === undefined) return null
 
     let badgeClass = 'score-badge '
     let emoji = ''
