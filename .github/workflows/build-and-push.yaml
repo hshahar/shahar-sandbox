@@ -10,8 +10,8 @@ on:
     branches: [develop, staging, main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository }}
+  AWS_REGION: us-west-2
+  ECR_REGISTRY: 179580348028.dkr.ecr.us-west-2.amazonaws.com
 
 jobs:
   validate:
@@ -44,7 +44,7 @@ jobs:
     if: github.event_name == 'push'
     permissions:
       contents: write
-      packages: write
+      id-token: write
     
     outputs:
       image_tag: ${{ steps.tags.outputs.tag }}
@@ -55,28 +55,32 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
       - name: Determine image tags
         id: tags
         run: |
           BRANCH=${GITHUB_REF##*/}
           SHA_SHORT=$(echo $GITHUB_SHA | cut -c1-7)
-          TAG="${BRANCH}-${SHA_SHORT}"
           
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "backend_tag=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${TAG}" >> $GITHUB_OUTPUT
-          echo "frontend_tag=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${TAG}" >> $GITHUB_OUTPUT
-          echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
-
+          # Map branch to version
+          if [ "$BRANCH" == "main" ]; then
+            VERSION="v1.2"
+          elif [ "$BRANCH" == "staging" ]; then
+            VERSION="v1.2-staging"
+          else
+            VERSION="v1.2-dev"
+          fi
+          
+          TAG="${VERSION}-${SHA_SHORT}"
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
@@ -84,7 +88,8 @@ jobs:
           push: true
           tags: |
             ${{ steps.tags.outputs.backend_tag }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${{ steps.tags.outputs.branch }}-latest
+            ${{ env.ECR_REGISTRY }}/sha-blog-backend:${{ steps.tags.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/sha-blog-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
@@ -93,6 +98,18 @@ jobs:
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
+        with:
+          context: ./app/frontend
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.frontend_tag }}
+            ${{ env.ECR_REGISTRY }}/sha-blog-frontend:${{ steps.tags.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/sha-blog-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
         with:
           context: ./app/frontend
           push: true
@@ -111,32 +128,33 @@ jobs:
     needs: build-and-push
     if: github.event_name == 'push'
     permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install yq
-        run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-
       - name: Update Helm values
         run: |
           BRANCH=${GITHUB_REF##*/}
           SHA_SHORT=$(echo $GITHUB_SHA | cut -c1-7)
-          TAG="${BRANCH}-${SHA_SHORT}"
           
-          # Determine values file based on branch
-          if [ "$BRANCH" == "develop" ]; then
-            VALUES_FILE="helm/microservices-app/values-dev.yaml"
+          # Map branch to version
+          if [ "$BRANCH" == "main" ]; then
+            VERSION="v1.2"
+            VALUES_FILE="helm/microservices-app/values-eks.yaml"
           elif [ "$BRANCH" == "staging" ]; then
+            VERSION="v1.2-staging"
             VALUES_FILE="helm/microservices-app/values-staging.yaml"
-          elif [ "$BRANCH" == "main" ]; then
-            VALUES_FILE="helm/microservices-app/values-prod.yaml"
+          else
+            VERSION="v1.2-dev"
+            VALUES_FILE="helm/microservices-app/values-dev.yaml"
+          fi
+          
+          TAG="${VERSION}-${SHA_SHORT}"
+          
+          echo "Updating $VALUES_FILE with tag: $VERSION"
+          
+          # Update image tags to version (not full tag with SHA)
+          yq eval -i ".backend.image.tag = \"$VERSION\"" $VALUES_FILE
+          yq eval -i ".frontend.image.tag = \"$VERSION\"" $VALUES_FILE
+          
+          # Show diff
+          git diff $VALUES_FILEicroservices-app/values-prod.yaml"
           else
             echo "Unknown branch: $BRANCH"
             exit 0
@@ -166,9 +184,6 @@ jobs:
             exit 0
           fi
           
-          git commit -m "chore: update image tags to ${TAG} [skip ci]"
-          git push origin HEAD:${BRANCH}
-
   notify-argocd:
     name: Notify ArgoCD
     runs-on: ubuntu-latest
@@ -181,20 +196,23 @@ jobs:
           BRANCH=${GITHUB_REF##*/}
           
           if [ "$BRANCH" == "develop" ]; then
-            APP_NAME="k8s-blog-dev"
+            APP_NAME="sha-blog-dev"
           elif [ "$BRANCH" == "staging" ]; then
-            APP_NAME="k8s-blog-staging"
+            APP_NAME="sha-blog-staging"
           elif [ "$BRANCH" == "main" ]; then
-            APP_NAME="k8s-blog-prod"
+            APP_NAME="sha-blog-dev"
           else
             echo "No ArgoCD app for branch: $BRANCH"
             exit 0
           fi
           
           echo "ArgoCD will auto-sync $APP_NAME within 3 minutes"
-          echo "Or manually sync: argocd app sync $APP_NAME"
+          echo "Or manually sync: kubectl patch application $APP_NAME -n argocd --type merge -p '{\"metadata\":{\"annotations\":{\"argocd.argoproj.io/refresh\":\"hard\"}}}'"
           
           # Optional: Use ArgoCD webhook if configured
+          # curl -X POST https://argocd.example.com/api/webhook \
+          #   -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
+          #   -d '{"app": "'$APP_NAME'"}'if configured
           # curl -X POST https://argocd.example.com/api/webhook \
           #   -H "Authorization: Bearer ${{ secrets.ARGOCD_TOKEN }}" \
           #   -d '{"app": "'$APP_NAME'"}'
