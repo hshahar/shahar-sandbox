@@ -18,6 +18,15 @@ spec:
         app: ai-agent
         {{- include "microservices-app.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.aiAgent.useKarpenter }}
+      tolerations:
+      - key: workload
+        operator: Equal
+        value: ai
+        effect: NoSchedule
+      nodeSelector:
+        workload: ai
+      {{- end }}
       containers:
       - name: ai-agent
         image: "{{ .Values.aiAgent.image.repository }}:{{ .Values.aiAgent.image.tag }}"
@@ -52,6 +61,16 @@ spec:
 
         resources:
           {{- toYaml .Values.aiAgent.resources | nindent 10 }}
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30  # 5 minutes total (30 * 10s)
+          successThreshold: 1
 
         livenessProbe:
           httpGet:
