@@ -6,7 +6,8 @@
       "Bash(kubectl cp:*)",
       "Bash(docker tag:*)",
       "Bash(kubectl create configmap:*)",
-      "Bash(kubectl apply:*)"
+      "Bash(kubectl apply:*)",
+      "Bash(gh run list:*)"
     ],
     "deny": [],
     "ask": []

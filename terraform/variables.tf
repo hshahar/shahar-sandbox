@@ -142,6 +142,58 @@ variable "install_keda" {
   default     = true
 }
 
+variable "install_karpenter" {
+  description = "Whether to install Karpenter for node autoscaling"
+  type        = bool
+  default     = true
+}
+
+variable "cluster_name" {
+  description = "EKS cluster name for Karpenter"
+  type        = string
+  default     = "sha-blog-eks"
+}
+
+variable "cluster_endpoint" {
+  description = "EKS cluster endpoint for Karpenter"
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider_arn" {
+  description = "OIDC provider ARN for Karpenter IAM role"
+  type        = string
+  default     = ""
+}
+
+variable "oidc_provider" {
+  description = "OIDC provider URL for Karpenter IAM role"
+  type        = string
+  default     = ""
+}
+
+variable "node_role_arn" {
+  description = "Node IAM role ARN for Karpenter"
+  type        = string
+  default     = ""
+}
+
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "common_tags" {
+  description = "Common tags for all resources"
+  type        = map(string)
+  default     = {
+    Project     = "SHA-K8s-Blog"
+    ManagedBy   = "Terraform"
+    Environment = "dev"
+  }
+}
+
 # Monitoring variables
 variable "install_prometheus" {
   description = "Whether to install Prometheus + Grafana stack"

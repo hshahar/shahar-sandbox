@@ -219,6 +219,8 @@ aiAgent:
   service:
     type: ClusterIP
     port: 8000
+  # Use Karpenter for AI workload nodes
+  useKarpenter: true
   # Model provider: "ollama" (free, local) or "openai" (paid, cloud)
   modelProvider: "ollama"  # Change to "openai" for better quality
   # Ollama configuration (local model)
@@ -231,11 +233,11 @@ aiAgent:
     model: "gpt-4-turbo-preview"  # Options: gpt-4-turbo-preview, gpt-3.5-turbo
   resources:
     limits:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 2000m
+      memory: 12Gi
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 1000m
+      memory: 8Gi
   persistence:
     enabled: true  # For vector database
     size: 5Gi
