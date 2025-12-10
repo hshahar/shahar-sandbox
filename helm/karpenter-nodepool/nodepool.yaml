@@ -1,0 +1,212 @@
+---
+# Karpenter NodePool - Defines the provisioning configuration
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  template:
+    metadata:
+      labels:
+        karpenter.sh/capacity-type: spot
+        node-type: general
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: default
+      
+      # Requirements for node selection
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["t", "m", "c"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["3"]
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["medium", "large", "xlarge", "2xlarge"]
+      
+      # Taints and tolerations
+      taints: []
+      
+      # Startup taints - removed after node is ready
+      startupTaints:
+        - key: karpenter.sh/unregistered
+          effect: NoSchedule
+  
+  # Disruption budget
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s
+    budgets:
+      - nodes: "20%"
+        reasons: ["Empty", "Underutilized"]
+  
+  # Limits
+  limits:
+    cpu: "100"
+    memory: 200Gi
+  
+  # Weight for scheduling priority
+  weight: 10
+
+---
+# EC2NodeClass - Defines AWS-specific configuration
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+  namespace: karpenter
+spec:
+  # AMI Selection
+  amiSelectorTerms:
+    - alias: al2023@latest
+  
+  # IAM Role for nodes
+  role: {{ NODE_ROLE_NAME }}
+  
+  # Subnet selection
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: {{ CLUSTER_NAME }}
+  
+  # Security group selection
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: {{ CLUSTER_NAME }}
+  
+  # User data for node configuration
+  userData: |
+    #!/bin/bash
+    echo "Karpenter-provisioned node starting up..."
+  
+  # Block device mappings
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 30Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+  
+  # Metadata options
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+  
+  # Tags for instances
+  tags:
+    ManagedBy: Karpenter
+    Environment: dev
+    Project: SHA-K8s-Blog
+
+---
+# NodePool for AI workloads (requires more resources)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: ai-workloads
+  namespace: karpenter
+spec:
+  template:
+    metadata:
+      labels:
+        karpenter.sh/capacity-type: on-demand
+        node-type: ai-workload
+        workload: ai
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: ai-workload
+      
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]  # AI workloads need stable nodes
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.k8s.aws/instance-size
+          operator: In
+          values: ["xlarge", "2xlarge", "4xlarge"]
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values: ["t3.xlarge", "t3.2xlarge", "m5.xlarge", "m5.2xlarge"]
+      
+      taints:
+        - key: workload
+          value: ai
+          effect: NoSchedule
+  
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 300s
+  
+  limits:
+    cpu: "50"
+    memory: 100Gi
+  
+  weight: 50
+
+---
+# EC2NodeClass for AI workloads
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: ai-workload
+  namespace: karpenter
+spec:
+  amiSelectorTerms:
+    - alias: al2023@latest
+  
+  role: {{ NODE_ROLE_NAME }}
+  
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: {{ CLUSTER_NAME }}
+  
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: {{ CLUSTER_NAME }}
+  
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 50Gi
+        volumeType: gp3
+        iops: 3000
+        throughput: 125
+        encrypted: true
+        deleteOnTermination: true
+  
+  metadataOptions:
+    httpEndpoint: enabled
+    httpProtocolIPv6: disabled
+    httpPutResponseHopLimit: 2
+    httpTokens: required
+  
+  tags:
+    ManagedBy: Karpenter
+    Environment: dev
+    Project: SHA-K8s-Blog
+    Workload: AI
