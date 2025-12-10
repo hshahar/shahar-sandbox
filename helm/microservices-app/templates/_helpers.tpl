@@ -72,3 +72,14 @@ Database labels
 {{ include "microservices-app.labels" . }}
 app.kubernetes.io/component: database
 {{- end }}
+
+{{/*
+Service Account Name
+*/}}
+{{- define "microservices-app.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "microservices-app.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}

@@ -112,6 +112,8 @@ limiter = Limiter(key_func=get_remote_address)
 # Graceful Shutdown State
 is_shutting_down = False
 shutdown_event = asyncio.Event()
+in_flight_requests = 0
+request_lock = asyncio.Lock()
 
 # Database Models
 class BlogPost(Base):
@@ -174,17 +176,26 @@ app.add_middleware(
 # Shutdown middleware - reject new requests during shutdown
 @app.middleware("http")
 async def shutdown_middleware(request: Request, call_next):
-    global is_shutting_down
+    global is_shutting_down, in_flight_requests
 
     if is_shutting_down and request.url.path not in ["/health", "/ready", "/metrics"]:
+        logger.warning(f"Rejecting request during shutdown: {request.url.path}")
         return Response(
             content="Service is shutting down",
             status_code=503,
             headers={"Retry-After": "30"}
         )
 
-    response = await call_next(request)
-    return response
+    # Track in-flight requests
+    async with request_lock:
+        in_flight_requests += 1
+    
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        async with request_lock:
+            in_flight_requests -= 1
 
 # Logging middleware
 @app.middleware("http")
@@ -316,13 +327,23 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    """Graceful shutdown - close database connections"""
-    global is_shutting_down
+    """Graceful shutdown - wait for in-flight requests, then close database connections"""
+    global is_shutting_down, in_flight_requests
     is_shutting_down = True
     logger.info("Graceful shutdown initiated")
 
-    # Wait a bit for in-flight requests to complete
-    await asyncio.sleep(2)
+    # Wait for in-flight requests to complete (max 25 seconds, Kubernetes gives us 30)
+    shutdown_timeout = 25
+    elapsed = 0
+    while in_flight_requests > 0 and elapsed < shutdown_timeout:
+        logger.info(f"Waiting for {in_flight_requests} in-flight requests to complete...")
+        await asyncio.sleep(0.5)
+        elapsed += 0.5
+
+    if in_flight_requests > 0:
+        logger.warning(f"Shutdown timeout reached with {in_flight_requests} requests still in-flight")
+    else:
+        logger.info("All in-flight requests completed")
 
     # Close database connections
     engine.dispose()
