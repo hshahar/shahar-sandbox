@@ -397,6 +397,8 @@ async def metrics():
 async def root():
     return {
         "message": "Kubernetes Blog Platform API",
+        "version": "1.2.0",
+        "features": ["graceful-shutdown", "karpenter-ready"],
         "docs": "/docs",
         "health": "/health"
     }
