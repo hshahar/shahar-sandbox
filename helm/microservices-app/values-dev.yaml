@@ -2,32 +2,28 @@
 
 environment: dev
 namespace: sha-dev
-
 # Vault integration - Disabled in dev (use basic secrets)
 vault:
   enabled: false
   refreshInterval: "5m"
-
 # Argo Rollouts - Disabled in dev (use regular Deployments)
 argoRollouts:
   enabled: false
-
 # Monitoring - Enabled for testing
 monitoring:
   enabled: true
   alerts:
     errorRate:
-      threshold: 10  # More lenient in dev
+      threshold: 10 # More lenient in dev
     latencyP95:
       threshold: 2000
-
 # Frontend configuration
 frontend:
   enabled: true
   replicas: 1
   image:
     repository: 179580348028.dkr.ecr.us-west-2.amazonaws.com/sha-blog-frontend
-    tag: "v1.2-2af8818"
+    tag: "v1.2-5fbf2b5"
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -36,14 +32,13 @@ frontend:
     requests:
       cpu: 100m
       memory: 128Mi
-
 # Backend configuration
 backend:
   enabled: true
   replicas: 1
   image:
     repository: 179580348028.dkr.ecr.us-west-2.amazonaws.com/sha-blog-backend
-    tag: "v1.2-2af8818"
+    tag: "v1.2-5fbf2b5"
     pullPolicy: IfNotPresent
   service:
     port: 8000
@@ -60,7 +55,6 @@ backend:
   aiAgent:
     enabled: true
     url: "http://ai-agent:8000"
-
 # PostgreSQL configuration - Optional in dev
 postgresql:
   enabled: true
@@ -77,7 +71,6 @@ postgresql:
       memory: 256Mi
   persistence:
     size: 1Gi
-
 # Ingress configuration
 ingress:
   enabled: true
@@ -92,7 +85,6 @@ ingress:
     nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
   tls:
     enabled: false
-
 # Secrets - Use weak passwords in dev
 secrets:
   database:
@@ -100,7 +92,6 @@ secrets:
     password: "devpass123"
   backend:
     apiKey: "dev-api-key-12345"
-
 # Security Configuration
 security:
   userNamespaces:
@@ -108,17 +99,15 @@ security:
   kyverno:
     enabled: false
     validationFailureAction: audit
-
 # Network Policy
 networkPolicy:
   enabled: true
   allowExternalEgress: true
-
 # AI Agent configuration
 aiAgent:
   enabled: true
   replicas: 1
-  modelProvider: "openai"  # or "ollama" for free local model
+  modelProvider: "openai" # or "ollama" for free local model
   image:
     repository: sha-ai-agent
     tag: "dev"
@@ -135,7 +124,7 @@ aiAgent:
       memory: 1Gi
   # OpenAI configuration (comment out if using Ollama)
   openai:
-    apiKey: ""  # Set this via --set or create a secret
+    apiKey: "" # Set this via --set or create a secret
     model: "gpt-4-turbo-preview"
   # Ollama configuration (uncomment if using local model)
   # ollama:
