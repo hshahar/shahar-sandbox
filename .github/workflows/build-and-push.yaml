@@ -75,11 +75,11 @@ jobs:
 
           # Map branch to version
           if [ "$BRANCH" == "main" ]; then
-            VERSION="v1.2"
+            VERSION="v1.3"
           elif [ "$BRANCH" == "staging" ]; then
-            VERSION="v1.2-staging"
+            VERSION="v1.3-staging"
           else
-            VERSION="v1.2-dev"
+            VERSION="v1.3-dev"
           fi
 
           TAG="${VERSION}-${SHA_SHORT}"
@@ -146,14 +146,14 @@ jobs:
 
           # Map branch to version and values file
           if [ "$BRANCH" == "main" ]; then
-            VERSION="v1.2"
+            VERSION="v1.3"
             # Update both dev and prod from main branch
             VALUES_FILES="helm/microservices-app/values-dev.yaml helm/microservices-app/values-prod.yaml"
           elif [ "$BRANCH" == "staging" ]; then
-            VERSION="v1.2-staging"
+            VERSION="v1.3-staging"
             VALUES_FILES="helm/microservices-app/values-staging.yaml"
           elif [ "$BRANCH" == "develop" ]; then
-            VERSION="v1.2-dev"
+            VERSION="v1.3-dev"
             VALUES_FILES="helm/microservices-app/values-dev.yaml"
           else
             echo "Unknown branch: $BRANCH, skipping manifest update"
