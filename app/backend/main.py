@@ -399,9 +399,10 @@ async def root():
     return {
         "message": "Kubernetes Blog Platform API",
         "version": "1.2.0",
-        "features": ["graceful-shutdown", "karpenter-ready"],
+        "features": ["graceful-shutdown", "in-flight-tracking", "karpenter-ready"],
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "ready": "/ready"
     }
 
 @app.get("/api/posts", response_model=List[BlogPostResponse])
