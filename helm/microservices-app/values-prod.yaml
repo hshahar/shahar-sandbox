@@ -46,7 +46,7 @@ frontend:
   replicas: 3
   image:
     repository: nginx
-    tag: "v1.2-c900438"
+    tag: "v1.2-fe88b75"
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -61,7 +61,7 @@ backend:
   replicas: 3
   image:
     repository: hashicorp/http-echo
-    tag: "v1.2-c900438"
+    tag: "v1.2-fe88b75"
     pullPolicy: IfNotPresent
   service:
     port: 8080
