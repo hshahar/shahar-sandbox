@@ -297,13 +297,13 @@ async def score_post(request: ScoreRequest, background_tasks: BackgroundTasks):
     """
     Score a single blog post
 
-    The scoring happens in the background, so this returns immediately.
-    Check GET /scores/{post_id} for results.
+    The scoring happens in a thread to avoid blocking the event loop.
+    Returns immediately with queued status.
     """
     logger.info(f"Received score request for post {request.post_id}")
 
-    # Add to background tasks
-    background_tasks.add_task(score_post_task, request.post_id)
+    # Run in thread pool to avoid blocking event loop with sync DB calls
+    background_tasks.add_task(score_post_task_sync, request.post_id)
 
     return {
         "message": f"Scoring post {request.post_id} in background",
@@ -312,7 +312,7 @@ async def score_post(request: ScoreRequest, background_tasks: BackgroundTasks):
     }
 
 async def score_post_task(post_id: int):
-    """Background task to score a post"""
+    """Background task to score a post (async version - deprecated, causes event loop blocking)"""
     try:
         logger.info(f"Starting analysis for post {post_id}")
 
@@ -329,6 +329,111 @@ async def score_post_task(post_id: int):
 
     except Exception as e:
         logger.error(f"Error scoring post {post_id}: {e}")
+
+def score_post_task_sync(post_id: int):
+    """Background task to score a post (synchronous version to avoid blocking event loop)"""
+    import asyncio
+    try:
+        logger.info(f"Starting analysis for post {post_id}")
+
+        # Get post - sync version
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id, title, category, content, author, created_at FROM blog_posts WHERE id = %s",
+                    (post_id,)
+                )
+                post = cur.fetchone()
+                if not post:
+                    logger.error(f"Post {post_id} not found")
+                    return
+                post = dict(post)
+        finally:
+            conn.close()
+
+        # Analyze with LLM - this is the slow part (Ollama)
+        if not llm:
+            # Demo mode
+            import random
+            scores = {
+                "technical_accuracy": random.randint(15, 25),
+                "clarity": random.randint(12, 20),
+                "completeness": random.randint(12, 20),
+                "code_quality": random.randint(8, 15),
+                "seo": random.randint(5, 10),
+                "engagement": random.randint(5, 10),
+                "suggestions": ["Add more code examples", "Improve the introduction", "Add a conclusion section"]
+            }
+        else:
+            # Real LLM analysis
+            prompt = SCORING_PROMPT.format(
+                title=post['title'],
+                category=post['category'],
+                author=post['author'],
+                content=post['content'][:2000],
+                similar_posts="No similar posts found."  # Simplified for now
+            )
+
+            try:
+                if LLM_PROVIDER == "ollama":
+                    response_text = llm.invoke(prompt)
+                    logger.info(f"Raw Ollama response (first 200 chars): {response_text[:200]}")
+                    
+                    import re
+                    first_brace = response_text.find('{')
+                    last_brace = response_text.rfind('}')
+                    
+                    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                        json_str = response_text[first_brace:last_brace + 1]
+                        json_str = json_str.replace('\\n', ' ').replace('\\r', ' ').replace('\\_', '_')
+                        json_str = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', json_str)
+                        scores = json.loads(json_str)
+                    else:
+                        logger.error(f"No JSON found in Ollama response")
+                        return
+                else:
+                    response = llm.invoke(prompt)
+                    scores = json.loads(response.content)
+            except Exception as e:
+                logger.error(f"LLM analysis error: {e}")
+                return
+
+        # Store results - sync version
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                total = (
+                    scores['technical_accuracy'] + scores['clarity'] + scores['completeness'] +
+                    scores['code_quality'] + scores['seo'] + scores['engagement']
+                )
+
+                cur.execute(
+                    "UPDATE blog_posts SET ai_score = %s, last_scored_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (total, post_id)
+                )
+
+                cur.execute(
+                    """INSERT INTO post_analysis (
+                        post_id, technical_accuracy_score, clarity_score, completeness_score,
+                        code_quality_score, seo_score, engagement_score, total_score,
+                        suggestions, model_version
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (
+                        post_id, scores['technical_accuracy'], scores['clarity'],
+                        scores['completeness'], scores['code_quality'], scores['seo'],
+                        scores['engagement'], total, json.dumps(scores.get('suggestions', [])),
+                        OLLAMA_MODEL if LLM_PROVIDER == "ollama" else "gpt-4-turbo-preview"
+                    )
+                )
+
+                conn.commit()
+                logger.info(f"Completed analysis for post {post_id}, score: {total}/100")
+        finally:
+            conn.close()
+
+    except Exception as e:
+        logger.error(f"Error scoring post {post_id}: {e}", exc_info=True)
 
 @app.post("/score/batch")
 async def score_batch(request: BatchScoreRequest, background_tasks: BackgroundTasks):
