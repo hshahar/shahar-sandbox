@@ -7,6 +7,16 @@ namespace: sha-dev
 nameOverride: ""
 fullnameOverride: ""
 
+# Gateway configuration
+gateway:
+  enabled: false  # Disable Gateway API by default, use Ingress instead
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
 # Vault integration
 vault:
   enabled: true  # Enable in all environments
@@ -69,6 +79,11 @@ frontend:
   # Graceful shutdown configuration
   terminationGracePeriodSeconds: 30
   preStopSleepSeconds: 5
+  # Health check probes
+  readinessProbe:
+    periodSeconds: 3
+  livenessProbe:
+    periodSeconds: 10
   # PodDisruptionBudget configuration
   pdb:
     enabled: true
@@ -130,6 +145,11 @@ backend:
   # Graceful shutdown configuration
   terminationGracePeriodSeconds: 60
   preStopSleepSeconds: 10
+  # Health check probes
+  readinessProbe:
+    periodSeconds: 3
+  livenessProbe:
+    periodSeconds: 10
   # PodDisruptionBudget configuration
   pdb:
     enabled: true
