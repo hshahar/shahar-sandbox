@@ -2,18 +2,16 @@
 
 environment: prod
 namespace: sha-production
-
 # Vault integration - Enabled for production
 vault:
   enabled: true
   refreshInterval: "1h"
-
 # Argo Rollouts - Enabled with conservative strategy
 argoRollouts:
   enabled: true
   canary:
     pauseDuration:
-      step1: "5m"    # Conservative rollout
+      step1: "5m" # Conservative rollout
       step2: "10m"
       step3: "15m"
   analysis:
@@ -34,7 +32,6 @@ argoRollouts:
       threshold: 99.9
       count: 10
       failureLimit: 0
-
 # Monitoring - Enabled with production-grade thresholds
 monitoring:
   enabled: true
@@ -43,14 +40,13 @@ monitoring:
       threshold: 1
     latencyP95:
       threshold: 300
-
 # Frontend configuration
 frontend:
   enabled: true
   replicas: 3
   image:
     repository: nginx
-    tag: "1.25-alpine"
+    tag: "v1.2-2af8818"
     pullPolicy: IfNotPresent
   resources:
     limits:
@@ -59,14 +55,13 @@ frontend:
     requests:
       cpu: 500m
       memory: 512Mi
-
 # Backend configuration
 backend:
   enabled: true
   replicas: 3
   image:
     repository: hashicorp/http-echo
-    tag: "latest"
+    tag: "v1.2-2af8818"
     pullPolicy: IfNotPresent
   service:
     port: 8080
@@ -83,7 +78,6 @@ backend:
     maxReplicas: 10
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 80
-
 # PostgreSQL configuration
 postgresql:
   enabled: true
@@ -100,7 +94,6 @@ postgresql:
       memory: 1Gi
   persistence:
     size: 20Gi
-
 # Ingress configuration
 ingress:
   enabled: true
@@ -116,8 +109,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
     nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "120"
   tls:
-    enabled: false  # Set to true in real production with valid cert
-
+    enabled: false # Set to true in real production with valid cert
 # Secrets - IMPORTANT: Change these in production!
 secrets:
   database:
@@ -125,22 +117,20 @@ secrets:
     password: "CHANGE-ME-IN-PRODUCTION-USE-VAULT"
   backend:
     apiKey: "CHANGE-ME-IN-PRODUCTION-USE-VAULT"
-
 # Security Configuration - PRODUCTION HARDENING
 security:
   userNamespaces:
-    enabled: true  # Strongly recommended for production
+    enabled: true # Strongly recommended for production
   kyverno:
     enabled: true
-    validationFailureAction: enforce  # STRICT mode in production
+    validationFailureAction: enforce # STRICT mode in production
     trustedRegistries:
-      - "your-registry.io"  # Only trust your registry
+      - "your-registry.io" # Only trust your registry
     cosign:
       keyless: true
       issuer: "https://token.actions.githubusercontent.com"
       subject: "https://github.com/yourusername/yourrepo/.github/workflows/*"
-
 # Network Policy - STRICT in production
 networkPolicy:
   enabled: true
-  allowExternalEgress: false  # Deny by default, whitelist specific endpoints
+  allowExternalEgress: false # Deny by default, whitelist specific endpoints
