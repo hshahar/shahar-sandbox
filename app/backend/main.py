@@ -113,7 +113,7 @@ limiter = Limiter(key_func=get_remote_address)
 is_shutting_down = False
 shutdown_event = asyncio.Event()
 in_flight_requests = 0
-request_lock = asyncio.Lock()
+request_lock = asyncio.Lock()  # Thread-safe counter for in-flight requests
 
 # Database Models
 class BlogPost(Base):
