@@ -6,9 +6,9 @@ namespace: sha-production
 vault:
   enabled: true
   refreshInterval: "1h"
-# Argo Rollouts - Enabled with conservative strategy
+# Argo Rollouts - Disabled (CRDs not installed)
 argoRollouts:
-  enabled: true
+  enabled: false
   canary:
     pauseDuration:
       step1: "5m" # Conservative rollout
@@ -122,7 +122,7 @@ security:
   userNamespaces:
     enabled: true # Strongly recommended for production
   kyverno:
-    enabled: true
+    enabled: false  # Disabled - CRDs not installed
     validationFailureAction: enforce # STRICT mode in production
     trustedRegistries:
       - "your-registry.io" # Only trust your registry
