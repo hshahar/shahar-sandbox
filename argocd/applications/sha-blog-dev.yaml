@@ -10,7 +10,7 @@ spec:
   
   source:
     # Pointing to Git repository for GitOps
-    repoURL: https://github.com/hshahar/Sumit-shaharH-test.git
+    repoURL: https://github.com/hshahar/shahar-sandbox.git
     targetRevision: HEAD
     path: helm/microservices-app
     helm:
