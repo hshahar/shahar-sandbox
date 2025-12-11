@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including dev dependencies for build)
-RUN npm ci
+RUN npm ci && \
+    chmod -R +x node_modules/.bin
 
 # Copy application code
 COPY . .
