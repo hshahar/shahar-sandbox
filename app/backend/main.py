@@ -157,7 +157,7 @@ class BlogPostResponse(BaseModel):
 app = FastAPI(
     title="K8s Blog Platform API",
     description="Backend API for Kubernetes blog platform",
-    version="1.0.0"
+    version="1.3.0"
 )
 
 # Rate limiter state
@@ -265,37 +265,60 @@ def get_db():
 # AI Scoring Functions
 async def trigger_ai_scoring(post_id: int):
     """
-    Trigger AI scoring for a blog post in the background
-    Sends request to AI agent service
+    Trigger AI scoring for a blog post in the background with retry logic
+    Implements exponential backoff (2s, 5s, 10s) for transient failures
     """
     if not AI_SCORING_ENABLED:
         logger.info(f"AI scoring disabled, skipping post {post_id}")
         return
 
-    try:
-        async with httpx.AsyncClient(timeout=90.0) as client:  # Increased timeout for Ollama LLM
-            response = await client.post(
-                f"{AI_AGENT_URL}/score",
-                json={"post_id": post_id}
-            )
+    max_retries = 3
+    retry_delays = [2, 5, 10]  # Exponential backoff
+    
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:  # Increased timeout for Ollama LLM
+                response = await client.post(
+                    f"{AI_AGENT_URL}/score",
+                    json={"post_id": post_id}
+                )
 
-            if response.status_code == 200:
-                logger.info(
-                    f"AI scoring triggered successfully for post {post_id}",
-                    extra={"post_id": post_id, "ai_agent_response": response.json()}
-                )
-            else:
-                logger.warning(
-                    f"AI scoring request failed for post {post_id}: {response.status_code}",
-                    extra={"post_id": post_id, "status_code": response.status_code}
-                )
-    except httpx.TimeoutException:
-        logger.warning(f"AI scoring request timeout for post {post_id}", extra={"post_id": post_id})
-    except Exception as e:
-        logger.error(
-            f"Error triggering AI scoring for post {post_id}: {str(e)}",
-            extra={"post_id": post_id, "error": str(e)}
-        )
+                if response.status_code == 200:
+                    logger.info(
+                        f"AI scoring triggered successfully for post {post_id} (attempt {attempt + 1})",
+                        extra={"post_id": post_id, "attempt": attempt + 1}
+                    )
+                    return  # Success - exit retry loop
+                else:
+                    logger.warning(
+                        f"AI scoring request failed for post {post_id}: {response.status_code} (attempt {attempt + 1})",
+                        extra={"post_id": post_id, "status_code": response.status_code, "attempt": attempt + 1}
+                    )
+        except httpx.TimeoutException:
+            logger.warning(
+                f"AI scoring request timeout for post {post_id} (attempt {attempt + 1})",
+                extra={"post_id": post_id, "attempt": attempt + 1}
+            )
+        except Exception as e:
+            logger.error(
+                f"Error triggering AI scoring for post {post_id}: {str(e)} (attempt {attempt + 1})",
+                extra={"post_id": post_id, "error": str(e), "attempt": attempt + 1}
+            )
+        
+        # Retry with exponential backoff (except on last attempt)
+        if attempt < max_retries - 1:
+            delay = retry_delays[attempt]
+            logger.info(
+                f"Retrying AI scoring for post {post_id} in {delay}s...",
+                extra={"post_id": post_id, "retry_delay": delay}
+            )
+            await asyncio.sleep(delay)
+    
+    # All retries exhausted
+    logger.error(
+        f"AI scoring failed for post {post_id} after {max_retries} attempts",
+        extra={"post_id": post_id, "max_retries": max_retries}
+    )
 
 # Signal handlers for graceful shutdown
 def handle_sigterm(signum, frame):
@@ -364,9 +387,9 @@ async def health_check():
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "service": "k8s-blog-backend",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "database": db_status,
-        "features": ["graceful-shutdown", "in-flight-tracking", "karpenter-ready"]
+        "features": ["graceful-shutdown", "in-flight-tracking", "karpenter-ready", "ai-retry-logic"]
     }
 
 # Readiness check
