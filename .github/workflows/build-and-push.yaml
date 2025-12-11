@@ -29,13 +29,11 @@ jobs:
       - name: Lint Helm charts
         run: |
           helm lint helm/microservices-app
-          helm lint helm/microservices-app --values helm/microservices-app/values-dev.yaml
-          helm lint helm/microservices-app --values helm/microservices-app/values-staging.yaml
-          helm lint helm/microservices-app --values helm/microservices-app/values-prod.yaml
+          helm lint helm/microservices-app --values helm/microservices-app/values-eks.yaml
 
       - name: Helm template test
         run: |
-          helm template k8s-blog ./helm/microservices-app --values helm/microservices-app/values-dev.yaml
+          helm template k8s-blog ./helm/microservices-app --values helm/microservices-app/values-eks.yaml
 
   build-and-push:
     name: Build and Push Docker Images
@@ -65,6 +63,10 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Determine image tags
         id: tags
         run: |
