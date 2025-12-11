@@ -364,8 +364,9 @@ async def health_check():
     return {
         "status": "healthy" if db_status == "connected" else "degraded",
         "service": "k8s-blog-backend",
-        "version": "1.0.0",
-        "database": db_status
+        "version": "1.2.0",
+        "database": db_status,
+        "features": ["graceful-shutdown", "in-flight-tracking", "karpenter-ready"]
     }
 
 # Readiness check
